@@ -1,5 +1,5 @@
-import { handleAnalyzeRequest } from '../worker/protocol';
 import type { AnalysisFailure } from '../worker/protocol';
+import { createAnalysisClient } from './analysis-client';
 import { BUNDLED_CASES, toAnalysisInput } from './cases';
 import type { BundledCase } from './cases';
 import { clear, el } from './dom';
@@ -18,7 +18,8 @@ export function mountApp(doc: Document): void {
   const title = required<HTMLElement>(doc, 'result-title');
   const body = required<HTMLElement>(doc, 'result-body');
   const buttons = new Map<string, HTMLButtonElement>();
-  let requestId = 0;
+  const client = createAnalysisClient();
+  let loadId = 0;
 
   function markLoaded(loadedId: string): void {
     for (const [id, button] of buttons) button.setAttribute('aria-pressed', id === loadedId ? 'true' : 'false');
@@ -43,15 +44,21 @@ export function mountApp(doc: Document): void {
   }
 
   function load(bundledCase: BundledCase): void {
-    requestId += 1;
-    const id = requestId;
+    loadId += 1;
+    const id = loadId;
     markLoaded(bundledCase.id);
-    setTimeout(() => {
-      const response = handleAnalyzeRequest({ type: 'analyze', requestId: id, input: toAnalysisInput(bundledCase) });
-      if (response.requestId !== requestId) return;
-      if (response.type === 'result') showResult(bundledCase, response.stream);
-      else showError(response.failure);
-    }, 0);
+    client.analyze(toAnalysisInput(bundledCase)).then(
+      (response) => {
+        if (id !== loadId) return;
+        if (response.type === 'result') showResult(bundledCase, response.stream);
+        else showError(response.failure);
+      },
+      (error: unknown) => {
+        if (id !== loadId) return;
+        const detail = error instanceof Error && error.message !== '' ? error.message : 'unknown error';
+        showError({ code: 'INTERNAL_ERROR', message: `Analysis stopped unexpectedly: ${detail}`, diagnostics: [] });
+      },
+    );
   }
 
   for (const bundledCase of BUNDLED_CASES) {
