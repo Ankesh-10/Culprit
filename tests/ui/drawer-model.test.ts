@@ -148,3 +148,131 @@ describe('signal titles and static wording', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+const MINUS = '\u2212';
+
+function withLeadingReferences(stream: AnalysisStream, references: AnalysisStream['ranking']['suspects'][number]['evidenceReferences']): AnalysisStream {
+  const [first, ...rest] = stream.ranking.suspects;
+  if (first === undefined) throw new Error('expected a suspect');
+  return { ...stream, ranking: { ...stream.ranking, suspects: [{ ...first, evidenceReferences: references }, ...rest] } };
+}
+
+function logEvent(path: string, line: number): AnalysisStream['ranking']['suspects'][number]['evidenceReferences'][number] {
+  return { type: 'log-event', sourceId: `event-${line}`, path, lineStart: line, lineEnd: line, detail: `error at line ${line}` };
+}
+
+const PAYMENT = 'src/checkout/payment.ts';
+
+describe('changed files and line ranges', () => {
+  it('lists the checkout leader files in commit order with counts, ranges and the stack-frame overlap', () => {
+    const view = drawer(CHECKOUT, 1);
+    expect(view.files).toEqual([
+      { path: PAYMENT, counts: `+46 ${MINUS}9`, ranges: [{ text: 'L104\u2013126', overlap: 'Overlaps stack frame at line 118' }] },
+      { path: 'src/checkout/handler.ts', counts: `+8 ${MINUS}2`, ranges: [{ text: 'L36\u201349', overlap: null }] },
+    ]);
+    expect(view.diffNote).toBe(DIFF_NOTE);
+  });
+
+  it('builds a drawer with no files when the commit is not in the history', () => {
+    const stream: AnalysisStream = { ...CHECKOUT, commits: CHECKOUT.commits.filter((commit) => !commit.sha.startsWith('2222222')) };
+    const view = drawer(stream, 1);
+    expect(view.files).toEqual([]);
+    expect(view.diffNote).toBe(DIFF_NOTE);
+    expect(view.signals).toHaveLength(4);
+  });
+
+  it('shows only package.json for the ambiguous leader, which has no trace match', () => {
+    const view = drawer(AMBIGUOUS, 1);
+    expect(view.summary.traceChip).toBe('No trace match');
+    expect(view.files).toEqual([{ path: 'package.json', counts: `+3 ${MINUS}3`, ranges: [{ text: 'L12\u201314', overlap: null }] }]);
+  });
+
+  it('uses the smallest cited line inside the inclusive range, and ignores other paths and outside lines', () => {
+    const lines = (...numbers: number[]) => withLeadingReferences(CHECKOUT, numbers.map((line) => logEvent(PAYMENT, line)));
+    const overlapOf = (stream: AnalysisStream): string | null => drawer(stream, 1).files[0]?.ranges[0]?.overlap ?? null;
+    expect(overlapOf(lines(118, 110, 120))).toBe('Overlaps stack frame at line 110');
+    expect(overlapOf(lines(104))).toBe('Overlaps stack frame at line 104');
+    expect(overlapOf(lines(126))).toBe('Overlaps stack frame at line 126');
+    expect(overlapOf(lines(103, 127))).toBeNull();
+    expect(overlapOf(withLeadingReferences(CHECKOUT, [logEvent('src/other.ts', 110)]))).toBeNull();
+    expect(overlapOf(withLeadingReferences(CHECKOUT, []))).toBeNull();
+  });
+
+  it('writes a one-line range as a single line number', () => {
+    const stream: AnalysisStream = {
+      ...CHECKOUT,
+      commits: CHECKOUT.commits.map((commit) =>
+        commit.sha.startsWith('2222222') ? { ...commit, files: [{ path: PAYMENT, added: 1, deleted: 0, ranges: [{ start: 7, end: 7 }] }] } : commit,
+      ),
+    };
+    expect(drawer(stream, 1).files[0]?.ranges[0]?.text).toBe('L7');
+  });
+});
+
+describe('evidence list', () => {
+  const view = drawer(CHECKOUT, 1);
+  const signature = CHECKOUT.errors[0]?.signature ?? '';
+
+  it('lists every evidence reference in order with a type label, location and detail', () => {
+    const suspect = CHECKOUT.ranking.suspects[0];
+    expect(view.evidence).toHaveLength(9);
+    expect(view.evidence.map((item) => item.typeLabel)).toEqual([
+      'Feature',
+      'File range',
+      'Error group',
+      'Log event',
+      'Log event',
+      'Log event',
+      'Error group',
+      'File range',
+      'File range',
+    ]);
+    expect(view.evidence.map((item) => item.detail)).toEqual((suspect?.evidenceReferences ?? []).map((reference) => reference.detail));
+    expect(view.evidence.map((item) => item.location)).toEqual([
+      null,
+      `${PAYMENT}:104\u2013126`,
+      null,
+      `${PAYMENT}:118`,
+      `${PAYMENT}:118`,
+      `${PAYMENT}:118`,
+      null,
+      'src/checkout/handler.ts:36\u201349',
+      `${PAYMENT}:104\u2013126`,
+    ]);
+  });
+
+  it('offers the log-line action only for error-group and log-event items, keyed by signature', () => {
+    expect(signature).not.toBe('');
+    expect(view.evidence.map((item) => item.action)).toEqual([
+      null,
+      null,
+      { signature },
+      { signature },
+      { signature },
+      { signature },
+      { signature },
+      null,
+      null,
+    ]);
+  });
+
+  it('gives a log event that belongs to no error group no action', () => {
+    const orphan = 'source-298db3a5-1';
+    const stream: AnalysisStream = {
+      ...CHECKOUT,
+      errors: CHECKOUT.errors.map((group) => ({ ...group, eventIds: group.eventIds.filter((id) => id !== orphan) })),
+    };
+    const items = drawer(stream, 1).evidence;
+    expect(items[3]?.typeLabel).toBe('Log event');
+    expect(items[3]?.action).toBeNull();
+    expect(items[4]?.action).toEqual({ signature });
+    expect(items[5]?.action).toEqual({ signature });
+  });
+
+  it('lists only the evidence that exists for the ambiguous leader', () => {
+    const items = drawer(AMBIGUOUS, 1).evidence;
+    const suspect = AMBIGUOUS.ranking.suspects[0];
+    expect(items.map((item) => item.detail)).toEqual((suspect?.evidenceReferences ?? []).map((reference) => reference.detail));
+    expect(items.some((item) => item.typeLabel === 'Log event')).toBe(false);
+  });
+});

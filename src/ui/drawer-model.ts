@@ -38,6 +38,26 @@ export interface DrawerSignalRow {
   explanation: string;
 }
 
+export interface DrawerRange {
+  text: string;
+  /** `Overlaps stack frame at line N` when a cited stack-frame line falls inside the range. */
+  overlap: string | null;
+}
+
+export interface DrawerFile {
+  path: string;
+  counts: string;
+  ranges: DrawerRange[];
+}
+
+export interface DrawerEvidenceItem {
+  typeLabel: string;
+  location: string | null;
+  detail: string;
+  /** Present for error-group and log-event items that map to an error signature. */
+  action: { signature: string } | null;
+}
+
 export interface DrawerView {
   rank: number;
   title: string;
@@ -47,6 +67,9 @@ export interface DrawerView {
   summary: DrawerSummary;
   signals: DrawerSignalRow[];
   total: string;
+  files: DrawerFile[];
+  diffNote: string;
+  evidence: DrawerEvidenceItem[];
 }
 
 function clamp01(value: number): number {
@@ -102,5 +125,8 @@ export function buildDrawerView(stream: AnalysisStream, rank: number): DrawerVie
     },
     signals,
     total: `Total suspicion score ${formatScore(suspect.score, 3)} (sum of the contributions above), rounded for display.`,
+    files: [],
+    diffNote: '',
+    evidence: [],
   };
 }
