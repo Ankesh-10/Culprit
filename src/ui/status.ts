@@ -1,6 +1,6 @@
 import type { AnalysisFailure } from '../worker/protocol';
 import { clear, el, icon } from './dom';
-import { EMPTY_STATE, ERROR_BODY, ERROR_HEADING, LOADING_LABEL } from './view-model';
+import { EMPTY_STATE, LOADING_LABEL, buildErrorSummary } from './view-model';
 import type { StatePanel, StatusView } from './view-model';
 
 function childByClass(container: HTMLElement, className: string, tag: 'div' | 'p', attrs: Record<string, string>, extraClass = ''): HTMLElement {
@@ -56,11 +56,45 @@ export function renderLoadingPlaceholder(): HTMLElement {
   return el('div', { className: 'loading-placeholder' }, [el('p', { text: LOADING_LABEL })]);
 }
 
-export function renderErrorState(failure: AnalysisFailure): HTMLElement {
-  const messages = failure.diagnostics.length > 0 ? failure.diagnostics.map((entry) => entry.message) : [failure.message];
-  return el('section', { className: 'state-panel state-error', attrs: { role: 'alert' } }, [
-    el('h3', { className: 'state-heading', text: ERROR_HEADING, attrs: { tabindex: '-1' } }),
-    el('p', { className: 'state-body', text: ERROR_BODY }),
-    el('ul', { className: 'problem-list' }, messages.map((message) => el('li', { text: message }))),
-  ]);
+export interface ErrorStateHandlers {
+  /** A "Fix input" link was activated for this field. */
+  onFix(target: 'log' | 'history'): void;
+}
+
+const FIX_LABEL: Record<'log' | 'history', string> = { log: 'Log', history: 'Git history' };
+
+/** The mapped error summary: heading (focus target), generic body, one entry per problem. */
+export function renderErrorState(
+  failure: AnalysisFailure,
+  sources: { logs: string; history: string },
+  handlers: ErrorStateHandlers,
+): HTMLElement {
+  const summary = buildErrorSummary(failure, sources);
+  const items = summary.entries.map((entry) => {
+    const children: Array<Node | string> = [icon('x-circle', 'icon problem-icon'), el('span', { className: 'problem-text', text: entry.text })];
+    const target = entry.fixTarget;
+    if (target !== null) {
+      children.push(
+        el('a', {
+          className: 'fix-link',
+          text: 'Fix input',
+          attrs: { href: `#own-${target}-field`, 'aria-label': `Fix input: ${FIX_LABEL[target]}` },
+          on: {
+            click: (event) => {
+              event.preventDefault();
+              handlers.onFix(target);
+            },
+          },
+        }),
+      );
+    }
+    return el('li', { className: 'problem-item' }, children);
+  });
+  const parts: HTMLElement[] = [
+    el('h3', { className: 'state-heading', text: summary.heading, attrs: { tabindex: '-1' } }),
+    el('p', { className: 'state-body', text: summary.body }),
+    el('ul', { className: 'problem-list' }, items),
+  ];
+  if (summary.moreText !== null) parts.push(el('p', { className: 'problem-more', text: summary.moreText }));
+  return el('section', { className: 'state-panel state-error', attrs: { role: 'alert' } }, parts);
 }

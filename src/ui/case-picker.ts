@@ -21,6 +21,25 @@ export interface CasePickerOptions {
   hasResult: boolean;
   sparklines: ReadonlyMap<string, readonly number[]>;
   onLoad(id: string): void;
+  ownFormOpen: boolean;
+  onToggleOwn(): void;
+}
+
+export const OWN_TOGGLE_ID = 'own-files';
+export const OWN_TOGGLE_TEXT = 'Use your own files';
+
+function renderOwnToggle(options: CasePickerOptions): HTMLButtonElement {
+  return el('button', {
+    className: options.hasResult ? 'case-toggle own-toggle' : 'button-secondary own-toggle',
+    text: OWN_TOGGLE_TEXT,
+    attrs: {
+      type: 'button',
+      'aria-expanded': options.ownFormOpen ? 'true' : 'false',
+      'aria-controls': 'own-files-form',
+      'data-case-id': OWN_TOGGLE_ID,
+    },
+    on: { click: () => options.onToggleOwn() },
+  });
 }
 
 function sparkline(counts: readonly number[]): SVGElement | null {
@@ -99,6 +118,7 @@ export function renderCasePicker(container: HTMLElement, options: CasePickerOpti
   for (const bundledCase of options.cases) {
     container.append(options.hasResult ? renderToggle(bundledCase, options) : renderCard(bundledCase, options));
   }
+  container.append(renderOwnToggle(options));
 
   if (focusedId !== null) {
     for (const child of Array.from(container.children)) {

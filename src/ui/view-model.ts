@@ -20,6 +20,7 @@ import {
   traceMatchLabel,
 } from './format';
 import type { PageState } from './state';
+import type { AnalysisFailure, UiDiagnostic } from '../worker/protocol';
 
 export type ResultKind = 'completed' | 'low-confidence' | 'no-incident' | 'insufficient-data' | 'no-eligible-commits';
 
@@ -261,6 +262,85 @@ export const ERROR_HEADING = "We couldn't analyze these inputs";
 export const ERROR_BODY =
   'Nothing was uploaded and nothing changed. Fix the item below and analyze again, or load a bundled incident to compare formats.';
 export const LOADING_LABEL = 'Analyzing locally...';
+
+export interface ErrorEntry {
+  field: 'log' | 'history' | 'analysis';
+  code: string;
+  text: string;
+  fixTarget: 'log' | 'history' | null;
+}
+
+export interface ErrorSummary {
+  heading: typeof ERROR_HEADING;
+  body: typeof ERROR_BODY;
+  entries: ErrorEntry[];
+  moreText: string | null;
+}
+
+export const MAX_ERROR_ENTRIES = 20;
+
+const UNSUPPORTED_TEXT =
+  "This format isn't supported. Use a JSON-lines log or plain text with ISO timestamps and levels, plus a Culprit JSON history export. The README lists the supported formats.";
+const LIMIT_TEXT = 'This input is over the limit of 1 MiB or 10,000 events. Trim the log to the incident window and try again.';
+
+const FIELD_NOUN: Record<ErrorEntry['field'], string> = {
+  log: 'log',
+  history: 'git history',
+  analysis: 'analysis input',
+};
+
+function fieldOf(source: string, sources: { logs: string; history: string }): ErrorEntry['field'] {
+  if (source === sources.logs || source === 'logs') return 'log';
+  if (source === sources.history || source === 'history') return 'history';
+  return 'analysis';
+}
+
+function entryText(diagnostic: UiDiagnostic, noun: string): string {
+  switch (diagnostic.code) {
+    case 'EMPTY_INPUT':
+      return `The ${noun} is empty. Choose a file or paste text, then analyze again.`;
+    case 'MALFORMED_RECORD':
+      if (diagnostic.line !== null) {
+        return `Line ${diagnostic.line} of the ${noun} couldn't be read. Fix or remove that line, then analyze again.`;
+      }
+      if (diagnostic.record !== null) {
+        return `Record ${diagnostic.record} of the ${noun} couldn't be read. Fix or remove that record, then analyze again.`;
+      }
+      return `The ${noun} couldn't be read. Fix the file, then analyze again.`;
+    case 'UNSUPPORTED_FORMAT':
+      return UNSUPPORTED_TEXT;
+    case 'INPUT_LIMIT':
+      return LIMIT_TEXT;
+    default:
+      return `Check ${noun}: ${diagnostic.message}${diagnostic.line === null ? '' : ` (line ${diagnostic.line})`}`;
+  }
+}
+
+/**
+ * Plain-language, field-mapped problems for a failed analysis. `sources` are the two source names the UI
+ * passed to the analysis, so a diagnostic maps to the Log or Git history field by equality.
+ */
+export function buildErrorSummary(failure: AnalysisFailure, sources: { logs: string; history: string }): ErrorSummary {
+  const all: ErrorEntry[] =
+    failure.diagnostics.length === 0
+      ? [{ field: 'analysis', code: failure.code, text: failure.message, fixTarget: null }]
+      : failure.diagnostics.map((diagnostic): ErrorEntry => {
+          const field = fieldOf(diagnostic.source, sources);
+          return {
+            field,
+            code: diagnostic.code,
+            text: entryText(diagnostic, FIELD_NOUN[field]),
+            fixTarget: field === 'analysis' ? null : field,
+          };
+        });
+  const hidden = all.length - MAX_ERROR_ENTRIES;
+  return {
+    heading: ERROR_HEADING,
+    body: ERROR_BODY,
+    entries: all.slice(0, MAX_ERROR_ENTRIES),
+    moreText: hidden > 0 ? `${hidden} more diagnostics are not shown.` : null,
+  };
+}
 
 export const EMPTY_STATE: StatePanel = {
   heading: 'Load an incident to see which commits to check first',

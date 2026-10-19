@@ -1,0 +1,131 @@
+import { describe, expect, it } from 'vitest';
+import { findCase } from '../../src/ui/cases';
+import {
+  buildOwnAnalysisInput,
+  canAnalyze,
+  detectLogFormat,
+  emptyDraft,
+  resolveLogFormat,
+  resultLabel,
+  safeSourceName,
+  sourcesFor,
+} from '../../src/ui/intake';
+import type { OwnInputDraft } from '../../src/ui/intake';
+import { handleAnalyzeRequest } from '../../src/worker/protocol';
+
+function checkout() {
+  const found = findCase('checkout-outage');
+  if (found === undefined) throw new Error('missing checkout case');
+  return found;
+}
+
+function pastedDraft(): OwnInputDraft {
+  const bundled = checkout();
+  const draft = emptyDraft();
+  return {
+    ...draft,
+    log: { ...draft.log, text: bundled.logsText },
+    history: { ...draft.history, text: bundled.historyText },
+  };
+}
+
+describe('detectLogFormat and resolveLogFormat', () => {
+  it('treats a first non-empty line starting with { as JSON-lines', () => {
+    expect(detectLogFormat('{"timestamp":"2026-10-19T07:00:00Z"}\n')).toBe('jsonl');
+    expect(detectLogFormat('\n  \n   {"a":1}')).toBe('jsonl');
+  });
+
+  it('treats everything else, including empty text, as plain text', () => {
+    expect(detectLogFormat('2026-10-19T07:00:00Z error x')).toBe('plain-text');
+    expect(detectLogFormat('')).toBe('plain-text');
+    expect(detectLogFormat('   \n\n')).toBe('plain-text');
+  });
+
+  it('lets an explicit choice win and auto follow detection', () => {
+    expect(resolveLogFormat('jsonl', '2026-10-19T07:00:00Z error x')).toBe('jsonl');
+    expect(resolveLogFormat('plain-text', '{"a":1}')).toBe('plain-text');
+    expect(resolveLogFormat('auto', '{"a":1}')).toBe('jsonl');
+    expect(resolveLogFormat('auto', 'plain')).toBe('plain-text');
+  });
+});
+
+describe('canAnalyze', () => {
+  it('needs a non-whitespace character in both fields', () => {
+    const draft = emptyDraft();
+    expect(canAnalyze(draft)).toBe(false);
+    expect(canAnalyze({ ...draft, log: { ...draft.log, text: 'x' } })).toBe(false);
+    expect(canAnalyze({ ...draft, history: { ...draft.history, text: 'x' } })).toBe(false);
+    expect(canAnalyze({ log: { ...draft.log, text: '  \n ' }, history: { ...draft.history, text: 'x' }, formatChoice: 'auto' })).toBe(false);
+    expect(canAnalyze({ log: { ...draft.log, text: 'x' }, history: { ...draft.history, text: 'y' }, formatChoice: 'auto' })).toBe(true);
+  });
+});
+
+describe('safeSourceName', () => {
+  it('keeps a safe relative name', () => {
+    expect(safeSourceName('incident.jsonl', 'uploaded-log')).toBe('incident.jsonl');
+  });
+
+  it('falls back for empty, traversal, absolute and drive-letter names', () => {
+    for (const unsafe of ['', '..', '/abs.log', 'C:/x.log', '../x.log']) {
+      expect(safeSourceName(unsafe, 'uploaded-log')).toBe('uploaded-log');
+    }
+  });
+});
+
+describe('buildOwnAnalysisInput', () => {
+  it('builds the pasted checkout input with pasted source names', () => {
+    const input = buildOwnAnalysisInput(pastedDraft());
+    expect(input.logs.format).toBe('jsonl');
+    expect(input.history.format).toBe('culprit-json');
+    expect(input.logs.source).toBe('pasted-log');
+    expect(input.history.source).toBe('pasted-history');
+    expect(input.options).toBeNull();
+  });
+
+  it('reaches the same verdict as the bundled case', () => {
+    const response = handleAnalyzeRequest({ type: 'analyze', requestId: 1, input: buildOwnAnalysisInput(pastedDraft()) });
+    if (response.type !== 'result') throw new Error(`expected a result, got ${response.type}`);
+    expect(response.stream.ranking.suspects[0]?.shortSha).toBe('2222222');
+  });
+
+  it('uses chosen file names as sources and the explicit format choice', () => {
+    const draft = pastedDraft();
+    const input = buildOwnAnalysisInput({
+      ...draft,
+      log: { ...draft.log, fileName: 'incident.log', fileSize: 10 },
+      history: { ...draft.history, fileName: 'commits.json', fileSize: 10 },
+      formatChoice: 'plain-text',
+    });
+    expect(input.logs.source).toBe('incident.log');
+    expect(input.history.source).toBe('commits.json');
+    expect(input.logs.format).toBe('plain-text');
+  });
+
+  it('uses uploaded-* fallbacks for unsafe file names', () => {
+    const draft = pastedDraft();
+    const sources = sourcesFor({
+      ...draft,
+      log: { ...draft.log, fileName: '..', fileSize: 1 },
+      history: { ...draft.history, fileName: '/abs.json', fileSize: 1 },
+    });
+    expect(sources).toEqual({ logs: 'uploaded-log', history: 'uploaded-history' });
+  });
+
+  it('keeps log and history sources distinct when the file names match', () => {
+    const draft = pastedDraft();
+    const sources = sourcesFor({
+      ...draft,
+      log: { ...draft.log, fileName: 'incident.json', fileSize: 1 },
+      history: { ...draft.history, fileName: 'incident.json', fileSize: 1 },
+    });
+    expect(sources).toEqual({ logs: 'incident.json', history: 'history/incident.json' });
+  });
+});
+
+describe('resultLabel', () => {
+  it('names the chosen log file, else the pasted log', () => {
+    const draft = pastedDraft();
+    expect(resultLabel(draft)).toBe('pasted log');
+    expect(resultLabel({ ...draft, log: { ...draft.log, fileName: 'incident.jsonl', fileSize: 5 } })).toBe('incident.jsonl');
+  });
+});

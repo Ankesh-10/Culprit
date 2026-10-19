@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { AnalysisInput, AnalysisStream } from '../../src/core/model';
 import { findCase, toAnalysisInput } from '../../src/ui/cases';
 import { analyze } from '../../src/core/pipeline';
-import { buildConsideredRows, buildShortlistView, buildTrustFooterView, buildVerdictView } from '../../src/ui/view-model';
+import { buildConsideredRows, buildErrorSummary, buildShortlistView, buildTrustFooterView, buildVerdictView } from '../../src/ui/view-model';
+import { buildOwnAnalysisInput, emptyDraft, sourcesFor } from '../../src/ui/intake';
+import type { AnalysisFailure } from '../../src/worker/protocol';
 import { handleAnalyzeRequest } from '../../src/worker/protocol';
 
 function bundledStream(id: string): AnalysisStream {
@@ -270,5 +272,145 @@ describe('buildTrustFooterView', () => {
   it('formats a limit that is not a whole MiB with one decimal', () => {
     const odd = { ...CHECKOUT, limits: { ...CHECKOUT.limits, maxLogBytes: 1572864 } };
     expect(buildTrustFooterView(odd).limits).toBe('Limits: 1.5 MiB of log text, 10,000 events, 100 stack lines per event');
+  });
+});
+
+describe('buildErrorSummary', () => {
+  const SOURCES = { logs: 'pasted-log', history: 'pasted-history' };
+  const checkout = findCase('checkout-outage');
+  if (checkout === undefined) throw new Error('missing checkout case');
+
+  type Diagnostic = AnalysisFailure['diagnostics'][number];
+
+  function failureFor(logText: string, historyText: string): AnalysisFailure {
+    const draft = emptyDraft();
+    const input = buildOwnAnalysisInput({
+      ...draft,
+      log: { ...draft.log, text: logText },
+      history: { ...draft.history, text: historyText },
+    });
+    const response = handleAnalyzeRequest({ type: 'analyze', requestId: 1, input });
+    if (response.type !== 'error') throw new Error('expected a failure');
+    return response.failure;
+  }
+
+  function failure(diagnostics: Diagnostic[], code = 'MALFORMED_RECORD'): AnalysisFailure {
+    return { code, message: 'x', diagnostics };
+  }
+
+  function diagnostic(over: Partial<Diagnostic>): Diagnostic {
+    return { source: 'pasted-log', code: 'MALFORMED_RECORD', message: 'm', line: null, record: null, field: null, ...over };
+  }
+
+  it('carries the heading and generic body', () => {
+    const summary = buildErrorSummary(failure([diagnostic({})]), SOURCES);
+    expect(summary.heading).toBe("We couldn't analyze these inputs");
+    expect(summary.body).toBe(
+      'Nothing was uploaded and nothing changed. Fix the item below and analyze again, or load a bundled incident to compare formats.',
+    );
+  });
+
+  it('maps a real empty log to the log field', () => {
+    const summary = buildErrorSummary(failureFor('', checkout.historyText), SOURCES);
+    expect(summary.entries[0]).toMatchObject({
+      field: 'log',
+      text: 'The log is empty. Choose a file or paste text, then analyze again.',
+      fixTarget: 'log',
+    });
+  });
+
+  it('maps a real empty history to the history field', () => {
+    const summary = buildErrorSummary(failureFor(checkout.logsText, ''), SOURCES);
+    const entry = summary.entries.find((candidate) => candidate.field === 'history');
+    expect(entry?.text).toBe('The git history is empty. Choose a file or paste text, then analyze again.');
+    expect(entry?.fixTarget).toBe('history');
+  });
+
+  it('maps a real invalid history to the no-line copy', () => {
+    const summary = buildErrorSummary(failureFor(checkout.logsText, '{'), SOURCES);
+    const entry = summary.entries.find((candidate) => candidate.field === 'history');
+    expect(entry?.text).toBe("The git history couldn't be read. Fix the file, then analyze again.");
+  });
+
+  it('maps malformed records by line, by record and with neither', () => {
+    const byLine = buildErrorSummary(failure([diagnostic({ line: 7 })]), SOURCES).entries[0];
+    expect(byLine?.text).toBe("Line 7 of the log couldn't be read. Fix or remove that line, then analyze again.");
+    const byRecord = buildErrorSummary(failure([diagnostic({ source: 'pasted-history', record: 2 })]), SOURCES).entries[0];
+    expect(byRecord?.text).toBe("Record 2 of the git history couldn't be read. Fix or remove that record, then analyze again.");
+    expect(byRecord?.fixTarget).toBe('history');
+    const bare = buildErrorSummary(failure([diagnostic({})]), SOURCES).entries[0];
+    expect(bare?.text).toBe("The log couldn't be read. Fix the file, then analyze again.");
+  });
+
+  it('maps unsupported format and the input limit', () => {
+    const unsupported = buildErrorSummary(failure([diagnostic({ code: 'UNSUPPORTED_FORMAT' })], 'UNSUPPORTED_FORMAT'), SOURCES).entries[0];
+    expect(unsupported?.text).toBe(
+      "This format isn't supported. Use a JSON-lines log or plain text with ISO timestamps and levels, plus a Culprit JSON history export. The README lists the supported formats.",
+    );
+    const limit = buildErrorSummary(failure([diagnostic({ code: 'INPUT_LIMIT' })], 'INPUT_LIMIT'), SOURCES).entries[0];
+    expect(limit?.text).toBe('This input is over the limit of 1 MiB or 10,000 events. Trim the log to the incident window and try again.');
+  });
+
+  it('prefixes other codes with the field and appends the line', () => {
+    const entry = buildErrorSummary(
+      failure(
+        [diagnostic({ source: 'pasted-history', code: 'HISTORY_VALIDATION', message: 'History commits must be a non-empty array.', line: 3 })],
+        'HISTORY_VALIDATION',
+      ),
+      SOURCES,
+    ).entries[0];
+    expect(entry?.text).toBe('Check git history: History commits must be a non-empty array. (line 3)');
+  });
+
+  it('keeps analysis-level errors without a fix target', () => {
+    const entry = buildErrorSummary(
+      failure([diagnostic({ source: 'analysis', code: 'INVALID_ANALYSIS_INPUT' as Diagnostic['code'], message: 'Bad source.' })], 'INVALID_ANALYSIS_INPUT'),
+      SOURCES,
+    ).entries[0];
+    expect(entry?.field).toBe('analysis');
+    expect(entry?.text.startsWith('Check analysis input:')).toBe(true);
+    expect(entry?.fixTarget).toBeNull();
+  });
+
+  it('falls back to the failure message when there are no diagnostics', () => {
+    const summary = buildErrorSummary({ code: 'INTERNAL_ERROR', message: 'Analysis stopped unexpectedly: boom', diagnostics: [] }, SOURCES);
+    expect(summary.entries).toHaveLength(1);
+    expect(summary.entries[0]?.text).toBe('Analysis stopped unexpectedly: boom');
+    expect(summary.entries[0]?.fixTarget).toBeNull();
+  });
+
+  it('caps the list at 20 entries and says how many are hidden', () => {
+    const many = Array.from({ length: 25 }, (_, index) => diagnostic({ line: index + 1 }));
+    const summary = buildErrorSummary(failure(many), SOURCES);
+    expect(summary.entries).toHaveLength(20);
+    expect(summary.moreText).toBe('5 more diagnostics are not shown.');
+    expect(buildErrorSummary(failure([diagnostic({ line: 1 })]), SOURCES).moreText).toBeNull();
+  });
+
+  it('never claims causation or a probability', () => {
+    const samples = [
+      failureFor('', checkout.historyText),
+      failureFor(checkout.logsText, '{'),
+      failure([diagnostic({ code: 'UNSUPPORTED_FORMAT' }), diagnostic({ code: 'INPUT_LIMIT' }), diagnostic({ line: 4 })]),
+    ];
+    for (const sample of samples) {
+      const summary = buildErrorSummary(sample, SOURCES);
+      for (const text of [summary.heading, summary.body, ...summary.entries.map((entry) => entry.text)]) {
+        expect(text).not.toMatch(/\bcaused\b|root cause|culprit found|\d\s*%/i);
+      }
+    }
+  });
+
+  it('maps bundled-case fixture sources to the same fields', () => {
+    const bundledSources = { logs: checkout.logsSource, history: checkout.historySource };
+    const entry = buildErrorSummary(
+      failure([diagnostic({ source: checkout.historySource, code: 'EMPTY_INPUT' })], 'EMPTY_INPUT'),
+      bundledSources,
+    ).entries[0];
+    expect(entry?.field).toBe('history');
+  });
+
+  it('reads the pasted source names for an empty draft', () => {
+    expect(sourcesFor(emptyDraft())).toEqual(SOURCES);
   });
 });

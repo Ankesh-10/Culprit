@@ -5,6 +5,10 @@ import { renderCasePicker } from './case-picker';
 import { buildPostmortemMarkdown, copyText, markdownLineCount, renderCopyControl } from './copy';
 import type { CopyControl } from './copy';
 import { clear, el } from './dom';
+import { renderOwnFilesForm } from './inputs';
+import type { FieldName, OwnFilesForm } from './inputs';
+import { buildOwnAnalysisInput, canAnalyze, emptyDraft, resultLabel, sourcesFor } from './intake';
+import type { InputSources, OwnInputDraft } from './intake';
 import { dismissSuspectDrawer, openSuspectDrawer, updateSuspectDrawer } from './drawer';
 import type { DrawerHandlers } from './drawer';
 import { buildDrawerView } from './drawer-model';
@@ -39,7 +43,7 @@ import {
   deriveResultKind,
 } from './view-model';
 import { handleAnalyzeRequest } from '../worker/protocol';
-import type { AnalysisStream } from '../core/model';
+import type { AnalysisInput, AnalysisStream } from '../core/model';
 
 function required<T extends HTMLElement>(doc: Document, id: string): T {
   const node = doc.getElementById(id);
@@ -70,6 +74,21 @@ export function mountApp(doc: Document): void {
   let cancelBanner: () => void = () => undefined;
   let loadedId: string | null = null;
   let hasResult = false;
+
+  // Own-files path: the draft lives only in memory; a failed analysis never clears it.
+  let draft: OwnInputDraft = emptyDraft();
+  let ownFormOpen = false;
+  const requestSources = new Map<number, InputSources>();
+  const ownHost = el('div', { className: 'own-files-host', attrs: { id: 'own-files-host' } });
+  ownHost.hidden = true;
+  picker.after(ownHost);
+  const ownForm: OwnFilesForm = renderOwnFilesForm(draft, {
+    onDraftChange: (next) => {
+      draft = next;
+    },
+    onAnalyze: () => analyzeOwn(),
+  });
+  ownHost.append(ownForm.element);
 
   let investigation: InvestigationState | null = null;
   let activeStream: AnalysisStream | null = null;
@@ -214,9 +233,26 @@ export function mountApp(doc: Document): void {
     return el('div', { className: 'result-stack' }, parts);
   }
 
+  function renderError(settled: Extract<SettledState, { phase: 'error' }>): HTMLElement {
+    const sources = requestSources.get(settled.requestId) ?? { logs: '', history: '' };
+    return renderErrorState(settled.failure, sources, { onFix: fixInput });
+  }
+
+  /** "Fix input" opens the form if it is collapsed and moves focus to the field that needs fixing. */
+  function fixInput(target: FieldName): void {
+    setOwnFormOpen(true);
+    ownForm.focusField(target);
+  }
+
+  function setOwnFormOpen(open: boolean): void {
+    ownFormOpen = open;
+    ownHost.hidden = !open;
+    renderPicker();
+  }
+
   function renderSettled(settled: SettledState): HTMLElement {
     disposeInvestigation();
-    if (settled.phase === 'error') return renderErrorState(settled.failure);
+    if (settled.phase === 'error') return renderError(settled);
     const stream = settled.stream;
     const panel = buildStatePanel(stream);
     if (panel !== null) {
@@ -236,7 +272,15 @@ export function mountApp(doc: Document): void {
   }
 
   function renderPicker(): void {
-    renderCasePicker(picker, { cases: BUNDLED_CASES, loadedId, hasResult, sparklines, onLoad: loadById });
+    renderCasePicker(picker, {
+      cases: BUNDLED_CASES,
+      loadedId,
+      hasResult,
+      sparklines,
+      onLoad: loadById,
+      ownFormOpen,
+      onToggleOwn: () => setOwnFormOpen(!ownFormOpen),
+    });
   }
 
   function runWhenIdle(task: () => void): void {
@@ -300,7 +344,7 @@ export function mountApp(doc: Document): void {
       case 'error': {
         disposeInvestigation();
         title.hidden = true;
-        const content = renderErrorState(state.failure);
+        const content = renderError(state);
         showBody(content);
         content.querySelector<HTMLElement>('[tabindex="-1"]')?.focus();
         break;
@@ -317,15 +361,17 @@ export function mountApp(doc: Document): void {
     render(previous);
   }
 
-  function load(bundledCase: BundledCase): void {
+  /** One path for bundled cases and own files: latest request wins, the 150 ms banner applies to both. */
+  function runAnalysis(label: string, input: AnalysisInput, sources: InputSources, bundledId: string | null): void {
     requestCounter += 1;
     const requestId = requestCounter;
-    loadedId = bundledCase.id;
+    requestSources.set(requestId, sources);
+    loadedId = bundledId;
     renderPicker();
     cancelBanner();
-    dispatch({ type: 'start', requestId, label: bundledCase.name });
+    dispatch({ type: 'start', requestId, label });
     cancelBanner = scheduleLoadingBanner(requestId, timerScheduler, dispatch);
-    client.analyze(toAnalysisInput(bundledCase)).then(
+    client.analyze(input).then(
       (response) => {
         if (response.type === 'result') dispatch({ type: 'succeeded', requestId, stream: response.stream });
         else dispatch({ type: 'failed', requestId, failure: response.failure });
@@ -341,6 +387,20 @@ export function mountApp(doc: Document): void {
         if (requestId === requestCounter) cancelBanner();
       },
     );
+  }
+
+  function load(bundledCase: BundledCase): void {
+    runAnalysis(
+      bundledCase.name,
+      toAnalysisInput(bundledCase),
+      { logs: bundledCase.logsSource, history: bundledCase.historySource },
+      bundledCase.id,
+    );
+  }
+
+  function analyzeOwn(): void {
+    if (!canAnalyze(draft)) return;
+    runAnalysis(resultLabel(draft), buildOwnAnalysisInput(draft), sourcesFor(draft), null);
   }
 
   function loadById(id: string): void {
