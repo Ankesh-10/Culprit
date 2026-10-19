@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { AnalysisResult } from '../../src/core/model';
@@ -9,176 +10,305 @@ const fixtureIds = ['ambiguous', 'checkout-outage', 'slow-burn'] as const;
 const fixtureFiles = ['expected.json', 'history.json', 'logs.jsonl', 'manifest.json'] as const;
 
 type FixtureId = (typeof fixtureIds)[number];
-type JsonRecord = Record<string, any>;
+type JsonRecord = Record<string, unknown>;
 
-function readFixture(id: FixtureId, name: string): string {
-  return readFileSync(`${fixtureRoot}/${id}/${name}`, 'utf8');
+function asRecord(value: unknown, label: string): JsonRecord {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be a JSON object`);
+  }
+  return value as JsonRecord;
 }
 
-function loadFixture(id: FixtureId): { manifest: JsonRecord; logs: JsonRecord[]; history: JsonRecord; expected: JsonRecord; allText: string } {
-  const manifestText = readFixture(id, 'manifest.json');
-  const logsText = readFixture(id, 'logs.jsonl');
-  const historyText = readFixture(id, 'history.json');
-  const expectedText = readFixture(id, 'expected.json');
-  const manifest = JSON.parse(manifestText) as JsonRecord;
-  const logs = logsText.trim().split('\n').map((line) => JSON.parse(line) as JsonRecord);
-  const history = JSON.parse(historyText) as JsonRecord;
-  const expected = JSON.parse(expectedText) as JsonRecord;
+function asString(value: unknown, label: string): string {
+  if (typeof value !== 'string') {
+    throw new Error(`${label} must be a string`);
+  }
+  return value;
+}
+
+function asNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${label} must be a finite number`);
+  }
+  return value;
+}
+
+function asRecordArray(value: unknown, label: string): JsonRecord[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array`);
+  }
+  return value.map((entry, index) => asRecord(entry, `${label}[${index}]`));
+}
+
+function asStringArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${label} must be an array`);
+  }
+  return value.map((entry, index) => asString(entry, `${label}[${index}]`));
+}
+
+function field(record: JsonRecord, key: string, label = key): unknown {
+  const value = record[key];
+  if (value === undefined) {
+    throw new Error(`${label} is missing`);
+  }
+  return value;
+}
+
+function stringField(record: JsonRecord, key: string, label = key): string {
+  return asString(field(record, key, label), label);
+}
+
+function numberField(record: JsonRecord, key: string, label = key): number {
+  return asNumber(field(record, key, label), label);
+}
+
+function recordField(record: JsonRecord, key: string, label = key): JsonRecord {
+  return asRecord(field(record, key, label), label);
+}
+
+function recordArrayField(record: JsonRecord, key: string, label = key): JsonRecord[] {
+  return asRecordArray(field(record, key, label), label);
+}
+
+function stringArrayField(record: JsonRecord, key: string, label = key): string[] {
+  return asStringArray(field(record, key, label), label);
+}
+
+function readText(fixtureId: FixtureId, fileName: string): string {
+  return readFileSync(join(fixtureRoot, fixtureId, fileName), 'utf8');
+}
+
+function readJsonRecord(fixtureId: FixtureId, fileName: string): JsonRecord {
+  return asRecord(JSON.parse(readText(fixtureId, fileName)) as unknown, `${fixtureId}/${fileName}`);
+}
+
+function readFixture(fixtureId: FixtureId) {
+  const manifestText = readText(fixtureId, 'manifest.json');
+  const logsText = readText(fixtureId, 'logs.jsonl');
+  const historyText = readText(fixtureId, 'history.json');
+  const expectedText = readText(fixtureId, 'expected.json');
+  const logs = logsText
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0)
+    .map((line, index) => asRecord(JSON.parse(line) as unknown, `${fixtureId}/logs.jsonl:${index + 1}`));
 
   return {
-    manifest,
+    manifest: asRecord(JSON.parse(manifestText) as unknown, `${fixtureId}/manifest.json`),
     logs,
-    history,
-    expected,
+    history: asRecord(JSON.parse(historyText) as unknown, `${fixtureId}/history.json`),
+    expected: asRecord(JSON.parse(expectedText) as unknown, `${fixtureId}/expected.json`),
     allText: [manifestText, logsText, historyText, expectedText].join('\n'),
   };
 }
 
-function buildTracerResult(id: FixtureId, manifest: JsonRecord, logs: JsonRecord[], history: JsonRecord, expected: JsonRecord): AnalysisResult {
-  const firstCommit = history.commits[0] as JsonRecord;
-  const firstFile = firstCommit.files[0] as JsonRecord;
-  const eventIds = logs.map((_, index) => `event-${String(index + 1).padStart(3, '0')}`);
-  const timestamps = logs.map((event) => new Date(event.timestamp as string).toISOString());
-  const firstTimestamp = timestamps[0];
-  const lastTimestamp = timestamps[timestamps.length - 1];
-  if (firstTimestamp === undefined || lastTimestamp === undefined) {
-    throw new Error('Fixture must contain at least one log event');
-  }
-  const evidenceRequirements = expected.evidenceRequirements as string[];
-  const firstRange = (firstFile.ranges as JsonRecord[])[0];
+function buildTracerResult(
+  fixtureId: FixtureId,
+  manifest: JsonRecord,
+  logs: JsonRecord[],
+  history: JsonRecord,
+  expected: JsonRecord,
+): AnalysisResult {
+  const commits = recordArrayField(history, 'commits', `${fixtureId}.history.commits`);
+  const firstCommit = commits[0];
   const firstLog = logs[0];
-  if (firstRange === undefined || firstLog === undefined) {
-    throw new Error('Fixture must contain a file range and at least one log event');
+  if (firstCommit === undefined || firstLog === undefined) {
+    throw new Error(`${fixtureId} must contain a commit and a log event`);
   }
+
+  const firstFile = recordArrayField(firstCommit, 'files', `${fixtureId}.history.commits[0].files`)[0];
+  if (firstFile === undefined) {
+    throw new Error(`${fixtureId} must contain a file entry`);
+  }
+
+  const firstRange = recordArrayField(firstFile, 'ranges', `${fixtureId}.history.commits[0].files[0].ranges`)[0];
+  if (firstRange === undefined) {
+    throw new Error(`${fixtureId} must contain a changed line range`);
+  }
+
+  const manifestId = stringField(manifest, 'id', `${fixtureId}.manifest.id`);
+  const inputFormats = recordField(manifest, 'inputFormats', `${fixtureId}.manifest.inputFormats`);
+  const expectedOnset = recordField(expected, 'onset', `${fixtureId}.expected.onset`);
+  const caveats = stringArrayField(expected, 'caveats', `${fixtureId}.expected.caveats`);
+  const evidenceRequirements = stringArrayField(expected, 'evidenceRequirements', `${fixtureId}.expected.evidenceRequirements`);
+  const timestamps = logs.map((event, index) => new Date(stringField(event, 'timestamp', `${fixtureId}.logs[${index}].timestamp`)).toISOString());
+  const firstTimestamp = timestamps[0];
+  const lastTimestamp = timestamps.at(-1);
+  if (firstTimestamp === undefined || lastTimestamp === undefined) {
+    throw new Error(`${fixtureId} must contain timestamps`);
+  }
+
+  const onsetClass = stringField(expectedOnset, 'class', `${fixtureId}.expected.onset.class`) as AnalysisResult['incident']['status'];
+  const errorCount = logs.filter((event) => stringField(event, 'level') === 'error').length;
+  const primarySignature = `${manifestId}:primary`;
+  const firstPath = stringField(firstFile, 'path', `${fixtureId}.history.files[0].path`);
+  const firstLine = numberField(firstRange, 'start', `${fixtureId}.history.ranges[0].start`);
+  const lastLine = numberField(firstRange, 'end', `${fixtureId}.history.ranges[0].end`);
+  const firstSha = stringField(firstCommit, 'sha', `${fixtureId}.history.commits[0].sha`);
+  const representativeEvent = logs.find((event) => stringField(event, 'level') === 'error') ?? firstLog;
+
   const evidenceReferences = evidenceRequirements.map((requirement) => ({
     type: 'feature' as const,
-    sourceId: `${manifest.id as string}:${requirement}`,
-    path: firstFile.path as string,
-    lineStart: firstRange.start as number,
-    lineEnd: firstRange.end as number,
+    sourceId: `${manifestId}:${requirement}`,
+    path: firstPath,
+    lineStart: firstLine,
+    lineEnd: lastLine,
     detail: requirement,
   }));
-  const commits = history.commits as JsonRecord[];
-  const errorCount = logs.filter((event) => event.level === 'error').length;
-  const expectedOnset = expected.onset as JsonRecord;
 
   return {
-    schemaVersion: manifest.schemaVersion as 1,
+    schemaVersion: numberField(manifest, 'schemaVersion', `${fixtureId}.manifest.schemaVersion`) as 1,
     analysisVersion: 'analysis-v1',
     scoringVersion: 'scoring-v1',
     provenance: {
-      logSource: `fixtures/incidents/${id}/logs.jsonl`,
-      historySource: `fixtures/incidents/${id}/history.json`,
-      logFormat: manifest.inputFormats.logs,
-      historyFormat: manifest.inputFormats.history,
+      logSource: `fixtures/incidents/${fixtureId}/logs.jsonl`,
+      historySource: `fixtures/incidents/${fixtureId}/history.json`,
+      logFormat: stringField(inputFormats, 'logs') as 'jsonl',
+      historyFormat: stringField(inputFormats, 'history') as 'culprit-json',
       eventCount: logs.length,
       commitCount: commits.length,
     },
-    limits: { maxLogBytes: 1000000, maxEvents: 10000, maxStackLines: 100, truncated: false },
+    limits: {
+      maxLogBytes: 1_000_000,
+      maxEvents: 10_000,
+      maxStackLines: 100,
+      truncated: false,
+    },
     warnings: [],
-    assumptions: expected.caveats,
+    assumptions: caveats,
     diagnostics: [],
     incident: {
-      status: expectedOnset.class,
-      interpretation: expected.interpretation,
+      status: onsetClass,
+      interpretation: stringField(expected, 'interpretation', `${fixtureId}.expected.interpretation`),
       onset: {
-        class: expectedOnset.class,
-        windowStartUtc: expectedOnset.windowStartUtc,
-        windowEndUtc: expectedOnset.windowEndUtc,
+        class: onsetClass,
+        windowStartUtc: stringField(expectedOnset, 'windowStartUtc'),
+        windowEndUtc: stringField(expectedOnset, 'windowEndUtc'),
         baselineRate: 0,
         peakRate: errorCount,
-        explanation: manifest.purpose,
+        explanation: stringField(manifest, 'purpose', `${fixtureId}.manifest.purpose`),
       },
     },
     errors: [{
-      signature: `${manifest.id as string}:primary`,
-      representativeMessage: (logs.find((event) => event.level === 'error') ?? firstLog).message,
+      signature: primarySignature,
+      representativeMessage: stringField(representativeEvent, 'message'),
       count: errorCount,
       firstSeenUtc: firstTimestamp,
       lastSeenUtc: lastTimestamp,
-      eventIds,
-      stackFrames: [{ filePath: firstFile.path, line: firstRange.start, column: null, functionName: null, vendor: false }],
+      eventIds: logs.map((_, index) => `event-${String(index + 1).padStart(3, '0')}`),
+      stackFrames: [{
+        filePath: firstPath,
+        line: firstLine,
+        column: null,
+        functionName: null,
+        vendor: false,
+      }],
     }],
     timeline: [{
-      bucketStartUtc: expectedOnset.windowStartUtc,
-      bucketEndUtc: expectedOnset.windowEndUtc,
+      bucketStartUtc: stringField(expectedOnset, 'windowStartUtc'),
+      bucketEndUtc: stringField(expectedOnset, 'windowEndUtc'),
       errorCount,
-      errorGroupSignatures: [`${manifest.id as string}:primary`],
-      commitShas: commits.map((commit) => commit.sha as string),
+      errorGroupSignatures: [primarySignature],
+      commitShas: commits.map((commit) => stringField(commit, 'sha')),
     }],
-    suspects: commits.map((commit, index) => ({
-      rank: index + 1,
-      sha: commit.sha as string,
-      shortSha: (commit.sha as string).slice(0, 7),
-      subject: commit.subject as string,
-      author: commit.author as string,
-      committedAtUtc: commit.timestamp as string,
-      score: 1 / (index + 1),
-      signals: [],
-      evidenceReferences: index === 0 ? evidenceReferences : [],
-      tieBreakKey: `${1 / (index + 1)}|${commit.timestamp as string}|${commit.sha as string}`,
-    })),
-    confidence: { band: expected.confidence, rationale: (expected.caveats as string[]).join(' '), scoreSeparation: null, evidenceCompleteness: 1 },
-    tieBreak: { rule: 'score descending, commit timestamp descending, SHA ascending', appliedOrder: ['score', 'committedAtUtc', 'sha'] },
+    suspects: commits.map((commit, index) => {
+      const score = 1 / (index + 1);
+      const sha = stringField(commit, 'sha');
+      const timestamp = stringField(commit, 'timestamp');
+      return {
+        rank: index + 1,
+        sha,
+        shortSha: sha.slice(0, 7),
+        subject: stringField(commit, 'subject'),
+        author: stringField(commit, 'author'),
+        committedAtUtc: timestamp,
+        score,
+        signals: [],
+        evidenceReferences: index === 0 ? evidenceReferences : [],
+        tieBreakKey: `${score}|${timestamp}|${sha}`,
+      };
+    }),
+    confidence: {
+      band: stringField(expected, 'confidence') as AnalysisResult['confidence']['band'],
+      rationale: caveats.join(' '),
+      scoreSeparation: null,
+      evidenceCompleteness: 1,
+    },
+    tieBreak: {
+      rule: 'score descending, commit timestamp descending, SHA ascending',
+      appliedOrder: ['score', 'committedAtUtc', 'sha'],
+    },
   };
 }
 
 describe('shared incident fixture contract', () => {
-  it('enumerates exactly the three stable fixture IDs and four contract files', () => {
-    expect(readdirSync(fixtureRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()).toEqual(fixtureIds);
-    for (const id of fixtureIds) {
-      expect(readdirSync(`${fixtureRoot}/${id}`).sort()).toEqual(fixtureFiles);
-    }
+  it('contains exactly three stable fixture directories', () => {
+    const directories = readdirSync(fixtureRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+
+    expect(directories).toEqual([...fixtureIds]);
   });
 
-  it.each(fixtureIds)('validates %s metadata, data, evidence, and safe deterministic values', (id) => {
-    const { manifest, logs, history, expected, allText } = loadFixture(id);
-    const commits = history.commits as JsonRecord[];
-    const expectedOnset = expected.onset as JsonRecord;
+  it.each(fixtureIds)('contains the complete file contract for %s', (fixtureId) => {
+    const files = readdirSync(join(fixtureRoot, fixtureId)).sort();
+    expect(files).toEqual([...fixtureFiles]);
+  });
 
-    expect(manifest).toMatchObject({ schemaVersion: 1, id, inputFormats: { logs: 'jsonl', history: 'culprit-json' } });
-    expect(manifest.name).toBeTruthy();
-    expect(manifest.purpose).toBeTruthy();
-    expect(manifest.expected.interpretation).toBe(expected.interpretation);
-    expect(manifest.expected.onsetClass).toBe(expectedOnset.class);
-    expect(manifest.expected.confidence).toBe(expected.confidence);
-    expect(manifest.requiredEvidence).toEqual(expected.evidenceRequirements);
-    expect(manifest.caveats).toEqual(expected.caveats);
+  it.each(fixtureIds)('validates metadata and input shape for %s', (fixtureId) => {
+    const { manifest, logs, history, expected, allText } = readFixture(fixtureId);
+    const commits = recordArrayField(history, 'commits');
+    const expectedOnset = recordField(expected, 'onset');
+    const manifestExpected = recordField(manifest, 'expected');
+    const allFiles = commits.flatMap((commit) => recordArrayField(commit, 'files'));
+
+    expect(stringField(manifest, 'id')).toBe(fixtureId);
+    expect(numberField(manifest, 'schemaVersion')).toBe(1);
+    expect(stringField(manifest, 'name')).not.toBe('');
+    expect(stringField(manifest, 'purpose')).not.toBe('');
+    expect(stringField(manifestExpected, 'interpretation')).toBe(stringField(expected, 'interpretation'));
+    expect(stringField(manifestExpected, 'onsetClass')).toBe(stringField(expectedOnset, 'class'));
+    expect(stringField(manifestExpected, 'confidence')).toBe(stringField(expected, 'confidence'));
+    expect(stringArrayField(manifest, 'requiredEvidence')).toEqual(stringArrayField(expected, 'evidenceRequirements'));
+    expect(stringArrayField(manifest, 'caveats')).toEqual(stringArrayField(expected, 'caveats'));
+
     expect(logs.length).toBeGreaterThan(0);
-    expect(logs.every((event) => typeof event.timestamp === 'string' && Number.isFinite(Date.parse(event.timestamp)))).toBe(true);
+    expect(logs.every((event) => Number.isFinite(Date.parse(stringField(event, 'timestamp'))))).toBe(true);
     expect(logs.some((event) => typeof event.stack === 'string' && event.stack.includes('\n'))).toBe(true);
     expect(commits.length).toBeGreaterThanOrEqual(3);
-    expect(commits.every((commit) => /^[0-9a-f]{40}$/.test(commit.sha as string))).toBe(true);
-    expect(commits.flatMap((commit) => commit.files as JsonRecord[]).every((file) => /^[a-z0-9._/-]+$/.test(file.path as string))).toBe(true);
-    expect(commits.flatMap((commit) => commit.files as JsonRecord[]).every((file) => (file.ranges as JsonRecord[]).every((range) => range.start <= range.end))).toBe(true);
+    expect(commits.every((commit) => /^[0-9a-f]{40}$/.test(stringField(commit, 'sha')))).toBe(true);
+    expect(allFiles.every((file) => /^[a-z0-9._/-]+$/.test(stringField(file, 'path')))).toBe(true);
+    expect(allFiles.every((file) => !stringField(file, 'path').includes('\\'))).toBe(true);
+    expect(allFiles.every((file) => recordArrayField(file, 'ranges').every((range) => numberField(range, 'start') <= numberField(range, 'end')))).toBe(true);
 
-    if (id === 'slow-burn') {
-      expect(`${manifest.purpose} ${manifest.expected.interpretation}`).toMatch(/ramp|delayed/i);
-      expect(expectedOnset.class).toBe('ramp');
+    if (fixtureId === 'slow-burn') {
+      expect(`${stringField(manifest, 'purpose')} ${stringField(manifestExpected, 'interpretation')}`).toMatch(/ramp|delayed/i);
+      expect(stringField(expectedOnset, 'class')).toBe('ramp');
     }
-    if (id === 'ambiguous') {
-      expect(`${manifest.purpose} ${manifest.expected.interpretation}`).toMatch(/competing|weak|no-clear-culprit|no clear culprit/i);
-      expect(expected.confidence).toBe('low');
+
+    if (fixtureId === 'ambiguous') {
+      expect(`${stringField(manifest, 'purpose')} ${stringField(manifestExpected, 'interpretation')}`).toMatch(/competing|weak|no[- ]clear[- ]culprit/i);
+      expect(stringField(expected, 'confidence')).toBe('low');
     }
 
     expect(allText).not.toMatch(/(?:[A-Za-z]:[\\/]|^|\s)\//m);
-    expect((commits.flatMap((commit) => commit.files as JsonRecord[]).map((file) => file.path))).not.toContain(expect.stringContaining('\\'));
     expect(allText).not.toMatch(/(?:AKIA|BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY|password\s*[:=])/i);
     expect(allText).not.toMatch(/(?:Date\.now|Math\.random|randomUUID|current[-_ ]time|<timestamp>|\{\{[^}]+\}\})/i);
   });
 
-  it.each(fixtureIds)('serializes %s identically on repeat', (id) => {
-    const { manifest, logs, history, expected } = loadFixture(id);
-    const result = buildTracerResult(id, manifest, logs, history, expected);
-    const canonical = serializeCanonicalJson(result);
+  it.each(fixtureIds)('produces repeatable JSON and Markdown for %s', (fixtureId) => {
+    const { manifest, logs, history, expected } = readFixture(fixtureId);
+    const result = buildTracerResult(fixtureId, manifest, logs, history, expected);
+    const json = serializeCanonicalJson(result);
     const markdown = serializeMarkdown(result);
 
-    expect(canonical).toBe(serializeCanonicalJson(result));
+    expect(json).toBe(serializeCanonicalJson(result));
     expect(markdown).toBe(serializeMarkdown(result));
-    expect(canonical).toContain('"provenance"');
-    expect(canonical).toContain('"assumptions"');
+    expect(json).toContain('"provenance"');
+    expect(json).toContain('"assumptions"');
     expect(markdown).toContain('UTC disclosure');
-    expect(markdown).toContain((expected.caveats as string[])[0]);
+    expect(markdown).toContain(stringArrayField(expected, 'caveats')[0]);
     expect(markdown.endsWith('\n')).toBe(true);
   });
 });
