@@ -35,6 +35,11 @@ export function canonicalWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+/** Locale-independent code-unit comparison used for every deterministic ordering. */
+export function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 /** Normalize a repository-relative path to the cross-platform POSIX identity. */
 export function normalizeRepositoryPath(value: string): string {
   if (typeof value !== 'string') throw new TypeError('Repository path must be a string.');

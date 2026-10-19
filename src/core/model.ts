@@ -150,7 +150,10 @@ export interface UtcBucket {
   signatureCounts: Record<string, number>;
   eventIds: string[];
   errorGroupSignatures: string[];
-  /** Reserved for Phase 3 history correlation. */
+  /**
+   * Bucket-level commit lists stay empty. Commit correlation is exposed through
+   * `TimelinePoint.commitShas` and `RankingSummary.considered`.
+   */
   commitShas: string[];
 }
 
@@ -198,6 +201,16 @@ export interface SignalContribution {
   evidenceReferences: EvidenceReference[];
 }
 
+/** How strongly a commit's changed files line up with the top application frame of the errors. */
+export type TraceMatchKind = 'exact-line' | 'nearby-line' | 'file-only' | 'none';
+
+export interface TraceSummary {
+  matchKind: TraceMatchKind;
+  matchedErrorCount: number;
+  lineLevelErrorCount: number;
+  totalErrorCount: number;
+}
+
 export interface ScoredSuspect {
   rank: number;
   sha: string;
@@ -206,16 +219,53 @@ export interface ScoredSuspect {
   author: string;
   committedAtUtc: TimestampUtc;
   score: number;
+  /** Minutes between the commit and the onset window start; 0 when at or after it. */
+  timeGapMinutes: number;
+  traceSummary: TraceSummary;
   signals: SignalContribution[];
   evidenceReferences: EvidenceReference[];
   tieBreakKey: string;
 }
 
+/** Fixed display and serialization order of confidence labels. */
+export const CONFIDENCE_LABEL_ORDER = ['low-confidence', 'ambiguous', 'weak-evidence', 'no-clear-culprit'] as const;
+export type ConfidenceLabel = (typeof CONFIDENCE_LABEL_ORDER)[number];
+
 export interface ConfidenceRationale {
   band: ConfidenceBand;
+  labels: ConfidenceLabel[];
   rationale: string;
   scoreSeparation: number | null;
   evidenceCompleteness: number;
+}
+
+export type RankingStatus = 'ranked' | 'no-onset' | 'no-eligible-commits';
+export type CommitDispositionStatus = 'top-three' | 'scored' | 'excluded';
+
+/** What happened to one supplied commit during ranking. */
+export interface CommitDisposition {
+  sha: string;
+  shortSha: string;
+  subject: string;
+  author: string;
+  committedAtUtc: TimestampUtc;
+  status: CommitDispositionStatus;
+  rank: number | null;
+  score: number | null;
+  reason: string | null;
+}
+
+export interface RankingSummary {
+  status: RankingStatus;
+  referenceUtc: TimestampUtc | null;
+  eligibleCount: number;
+  considered: CommitDisposition[];
+}
+
+export interface RankingOutcome extends RankingSummary {
+  suspects: ScoredSuspect[];
+  confidence: ConfidenceRationale;
+  interpretation: string;
 }
 
 export interface TieBreakMetadata {
@@ -236,6 +286,7 @@ export interface AnalysisResult {
   errors: ErrorGroup[];
   timeline: TimelinePoint[];
   suspects: ScoredSuspect[];
+  ranking: RankingSummary;
   confidence: ConfidenceRationale;
   tieBreak: TieBreakMetadata;
 }
@@ -246,7 +297,7 @@ export interface AnalysisInput {
   options: { bucketMinutes: number; maxLogBytes: number } | null;
 }
 
-/** The complete serializable Phase 2 analysis stream before result projection. */
+/** The complete serializable analysis stream, including ranking, before result projection. */
 export interface AnalysisStream {
   schemaVersion: SchemaVersion;
   analysisVersion: AnalysisVersion;
@@ -259,6 +310,7 @@ export interface AnalysisStream {
   buckets: UtcBucket[];
   timeline: TimelinePoint[];
   onset: OnsetAnalysis;
+  ranking: RankingOutcome;
   warnings: string[];
   assumptions: string[];
   diagnostics: Diagnostic[];
