@@ -12,11 +12,34 @@
     <title>Culprit — Incident analysis</title>
   </head>
   <body>
-    <a class="skip-link" href="#result-title">Skip to results</a>
+    <svg class="sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-diamond" viewBox="0 0 16 16"><path d="M8 1 15 8 8 15 1 8Z" fill="currentColor" stroke="none" /></symbol>
+      <symbol id="icon-lock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="10" height="7" rx="1" /><path d="M5 7V5a3 3 0 0 1 6 0v2" /></symbol>
+      <symbol id="icon-clock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M8 4.5V8l2.5 1.5" /></symbol>
+      <symbol id="icon-info" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M8 7.5V11M8 5v.01" /></symbol>
+      <symbol id="icon-loader" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8a6 6 0 1 1-6-6" /></symbol>
+      <symbol id="icon-x-circle" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4" /></symbol>
+      <symbol id="icon-alert-triangle" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 14.5 13.5h-13Z" /><path d="M8 6.5v3M8 11.5v.01" /></symbol>
+      <symbol id="icon-check-circle" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6" /><path d="M5.2 8.2l2 2L11 6.4" /></symbol>
+      <symbol id="icon-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5l3.2 3.2L13 4.8" /></symbol>
+      <symbol id="icon-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1" /><path d="M3 10.5V4a1 1 0 0 1 1-1h6.5" /></symbol>
+      <symbol id="icon-close" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></symbol>
+      <symbol id="icon-chevron-left" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5" /></symbol>
+      <symbol id="icon-chevron-right" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5" /></symbol>
+      <symbol id="icon-file" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.5h5.5L13 5v9.5H4Z" /><path d="M9.5 1.5V5H13" /></symbol>
+    </svg>
+    <a class="skip-link" href="#result">Skip to results</a>
     <main id="app" class="shell">
       <header class="site-header">
-        <p class="wordmark">Culprit</p>
+        <div class="brand">
+          <svg class="icon wordmark-glyph" width="20" height="20" aria-hidden="true" focusable="false"><use href="#icon-diamond" /></svg>
+          <p class="wordmark">Culprit</p>
+        </div>
         <p class="purpose">Find the commits worth checking first, with evidence you can verify.</p>
+        <ul class="header-chips">
+          <li class="chip"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-lock" /></svg>Local only: nothing leaves this browser</li>
+          <li class="chip"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-clock" /></svg>All times UTC</li>
+        </ul>
       </header>
       <section id="input-panel" class="panel" aria-labelledby="input-title">
         <h2 id="input-title">Load an incident</h2>
@@ -26,7 +49,7 @@
         <div class="status-banner" hidden></div>
         <p id="status" class="status-announcer visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
       </div>
-      <section id="result" class="panel" aria-labelledby="result-title">
+      <section id="result" class="panel" aria-labelledby="result-title" tabindex="-1">
         <h2 id="result-title" tabindex="-1" hidden></h2>
         <div id="result-body"></div>
       </section>

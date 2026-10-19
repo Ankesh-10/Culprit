@@ -1,12 +1,15 @@
 import { createAnalysisClient } from './analysis-client';
 import { BUNDLED_CASES, toAnalysisInput } from './cases';
 import type { BundledCase } from './cases';
+import { renderCasePicker } from './case-picker';
 import { clear, el } from './dom';
+import { registerLocalFonts } from './fonts';
 import { initialPageState, reducePage, scheduleLoadingBanner } from './state';
 import type { PageEvent, PageState, Scheduler, SettledState } from './state';
 import { renderEmptyState, renderErrorState, renderLoadingPlaceholder, renderStatePanel, renderStatus } from './status';
 import { renderVerdict } from './verdict';
 import { buildStatePanel, buildStatusView, buildVerdictView } from './view-model';
+import { handleAnalyzeRequest } from '../worker/protocol';
 
 function required<T extends HTMLElement>(doc: Document, id: string): T {
   const node = doc.getElementById(id);
@@ -33,15 +36,42 @@ export function mountApp(doc: Document): void {
   const resultRegion = required<HTMLElement>(doc, 'result');
   const title = required<HTMLElement>(doc, 'result-title');
   const body = required<HTMLElement>(doc, 'result-body');
-  const buttons = new Map<string, HTMLButtonElement>();
   const client = createAnalysisClient();
+  const sparklines = new Map<string, readonly number[]>();
+  registerLocalFonts();
 
   let state: PageState = initialPageState;
   let requestCounter = 0;
   let cancelBanner: () => void = () => undefined;
+  let loadedId: string | null = null;
+  let hasResult = false;
 
-  function markLoaded(loadedId: string): void {
-    for (const [id, button] of buttons) button.setAttribute('aria-pressed', id === loadedId ? 'true' : 'false');
+  function renderPicker(): void {
+    renderCasePicker(picker, { cases: BUNDLED_CASES, loadedId, hasResult, sparklines, onLoad: loadById });
+  }
+
+  function runWhenIdle(task: () => void): void {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => task());
+    else setTimeout(task, 0);
+  }
+
+  /** Real error-rate sparklines come from the pure core on idle time; a failure just omits that card's line. */
+  function computeSparklines(): void {
+    for (const bundledCase of BUNDLED_CASES) {
+      runWhenIdle(() => {
+        try {
+          const response = handleAnalyzeRequest({ type: 'analyze', requestId: 0, input: toAnalysisInput(bundledCase) });
+          if (response.type !== 'result') return;
+          sparklines.set(
+            bundledCase.id,
+            response.stream.timeline.map((point) => point.errorCount),
+          );
+          renderPicker();
+        } catch {
+          // Leave this card without a sparkline; case loading is unaffected.
+        }
+      });
+    }
   }
 
   function showBody(content: HTMLElement): void {
@@ -65,6 +95,10 @@ export function mountApp(doc: Document): void {
         showBody(state.previous === null ? renderLoadingPlaceholder() : renderSettled(state.previous));
         break;
       case 'done': {
+        if (!hasResult) {
+          hasResult = true;
+          renderPicker();
+        }
         title.hidden = false;
         title.textContent = `Result: ${state.label}`;
         showBody(renderSettled(state));
@@ -92,7 +126,8 @@ export function mountApp(doc: Document): void {
   function load(bundledCase: BundledCase): void {
     requestCounter += 1;
     const requestId = requestCounter;
-    markLoaded(bundledCase.id);
+    loadedId = bundledCase.id;
+    renderPicker();
     cancelBanner();
     dispatch({ type: 'start', requestId, label: bundledCase.name });
     cancelBanner = scheduleLoadingBanner(requestId, timerScheduler, dispatch);
@@ -114,16 +149,12 @@ export function mountApp(doc: Document): void {
     );
   }
 
-  for (const bundledCase of BUNDLED_CASES) {
-    const button = el('button', {
-      className: 'case-button',
-      text: bundledCase.name,
-      attrs: { type: 'button', 'aria-label': `Load ${bundledCase.name}`, 'aria-pressed': 'false' },
-      on: { click: () => load(bundledCase) },
-    });
-    buttons.set(bundledCase.id, button);
-    picker.append(button);
+  function loadById(id: string): void {
+    const bundledCase = BUNDLED_CASES.find((entry) => entry.id === id);
+    if (bundledCase !== undefined) load(bundledCase);
   }
 
+  renderPicker();
   render({ phase: 'idle' });
+  computeSparklines();
 }
