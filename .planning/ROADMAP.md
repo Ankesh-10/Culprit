@@ -76,7 +76,7 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 
 ## Phase 4: Incident Console and Investigation Flow
 
-**Plans:** 6/8 plans executed
+**Plans:** 7/8 plans executed
 
 - [x] 04-01: One-click case analysis through the worker boundary (cases.ts, protocol/worker/client, verdict headline, static safety)
 - [x] 04-02: Honest page states and the case-file visual system (state.ts, status.ts, case cards and sparklines, tokens, local fonts with fallback)
@@ -84,7 +84,7 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 - [x] 04-04: Linked timeline investigation and log lines (timeline-geometry.ts, investigation-model.ts, slider, table twin)
 - [x] 04-05: Error signatures that filter the investigation (signatures.ts, emphasis form, filtered readout and log lines)
 - [x] 04-06: The suspect drawer (drawer-model.ts, drawer.ts, openers from verdict, lineup and timeline markers)
-- [ ] 04-07: Markdown postmortem copy and the trust footer (copy.ts, copy feedback, trust-footer.ts)
+- [x] 04-07: Markdown postmortem copy and the trust footer (copy.ts, copy feedback, trust-footer.ts)
 - [ ] 04-08: Own files, recoverable validation errors, and the end-of-phase walk-through (intake.ts, inputs.ts, human checkpoint)
 
 **Goal:** Make the analysis useful in the browser through one-click case studies, an evidence-first verdict, linked timeline investigation, and recoverable accessible states.
