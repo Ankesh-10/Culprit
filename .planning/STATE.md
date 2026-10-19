@@ -1,14 +1,14 @@
 ---
 gsd_state_version: "1.0"
 status: executing
-stopped_at: Completed 04-05-PLAN.md
-last_updated: "2026-10-19T17:38:02.820Z"
-state_head: d5041cf874baef97c17e20fa8e7e75d3e66965bc
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-10-19T17:49:54.279Z"
+state_head: d32acd6160596bc9d70fd3e3d54c20594d991fe8
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 13
+  completed_plans: 14
   percent: 60
 current_phase: 4
 current_phase_name: Incident Console and Investigation Flow
@@ -29,10 +29,10 @@ current_phase_name: Incident Console and Investigation Flow
 ## Current Position
 
 - **Phase:** Phase 4 (Incident Console and Investigation Flow) in progress.
-- **Current Plan:** 6
+- **Current Plan:** 7
 - **Total Plans in Phase:** 8
-- **Progress:** 3/5 phases complete; Phase 4 plans 5/8 complete (04-06 next).
-- **Last action:** Completed 04-05: error signatures table with aria-pressed filter toggles; the signature filter drives the emphasis chart, readout, log lines (signature and interval scope), filter chip with Clear filter and the filtered data table.
+- **Progress:** 3/5 phases complete; Phase 4 plans 6/8 complete (04-07 next).
+- **Last action:** Completed 04-06: native modal suspect drawer with per-signal arithmetic, changed line ranges with stack-frame overlap, evidence with Show matching log lines, opened from the verdict, lineup and focusable top-three timeline markers.
 
 ## Decisions
 
@@ -53,6 +53,8 @@ current_phase_name: Incident Console and Investigation Flow
 - [Phase 04]: 04-04: Viewport width drives tick count, plot height and #2/#3 label dropping; container width drives SVG width; tooltip text is the readout string split on the separator
 - [Phase 04]: 04-05: a selection change returns an open signature-scope log panel to bucket scope; a signature-scope open without a filter falls back to bucket scope
 - [Phase 04]: 04-05: signature filter keeps the y-axis max from unfiltered totals; emphasis form is gray total plus blue filtered line; signatureCounts lookups use Object.hasOwn
+- [Phase 04]: 04-06: drawer bar fill uses the signal value (equals contribution/weight without the 6-decimal rounding); changed files follow stream.commits order (by path)
+- [Phase 04]: 04-06: top-three timeline markers are real buttons in a layer beside the aria-hidden SVG; Show matching log lines dismisses the drawer without focus return then sets the filter and opens signature log lines
 
 ## Blockers
 
@@ -71,8 +73,8 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 
 ## Session Continuity
 
-**Last session:** 2026-10-19T17:38:02.594Z
-**Stopped at:** Completed 04-05-PLAN.md
+**Last session:** 2026-10-19T17:49:54.047Z
+**Stopped at:** Completed 04-06-PLAN.md
 **Resume file:** None
 
 - **Last session:** 2026-10-19 — Phase 2 implementation and verification completed.
@@ -94,3 +96,4 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 | Phase 04 P03 | 6 min | 2 tasks | 8 files |
 | Phase 04 P04 | 14 min | 2 tasks | 9 files |
 | Phase 04 P05 | 5 min | 2 tasks | 7 files |
+| Phase 04 P06 | 8 min | 2 tasks | 9 files |
