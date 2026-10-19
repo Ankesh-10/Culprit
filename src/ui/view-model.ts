@@ -146,6 +146,44 @@ export function buildVerdictView(stream: AnalysisStream): VerdictView | null {
   };
 }
 
+export interface ShortlistRow {
+  rank: number;
+  rankLabel: string;
+  leading: boolean;
+  diamond: 'leading' | 'ranked';
+  shortSha: string;
+  subject: string;
+  byline: string;
+  gap: string;
+  scoreText: string;
+  scoreFraction: number;
+  traceChip: string;
+  matches: string;
+}
+
+export interface ShortlistView {
+  heading: 'Suspect lineup';
+  countText: string;
+  rows: ShortlistRow[];
+}
+
+export interface ConsideredRow {
+  rank: string;
+  shortSha: string;
+  subject: string;
+  status: 'Top three' | 'Scored' | 'Excluded';
+  score: string;
+  reason: string;
+}
+
+export function buildShortlistView(_stream: AnalysisStream): ShortlistView | null {
+  throw new Error('not implemented');
+}
+
+export function buildConsideredRows(_stream: AnalysisStream): { summary: string; rows: ConsideredRow[] } {
+  throw new Error('not implemented');
+}
+
 export type StatusIcon = 'info' | 'loader' | 'x-circle' | 'alert-triangle' | 'check-circle';
 export type StatusTone = 'neutral' | 'good' | 'warning' | 'critical';
 
