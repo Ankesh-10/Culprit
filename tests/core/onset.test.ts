@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { ErrorGroup, LogEvent } from '../../src/core/model';
+import type { ErrorGroup, LogEvent, UtcBucket } from '../../src/core/model';
 import { buildUtcBuckets } from '../../src/core/buckets';
+import { classifyOnset } from '../../src/core/onset';
 
 function event(id: string, timestampUtc: string): LogEvent {
   return {
@@ -26,6 +27,20 @@ function group(eventIds: string[]): ErrorGroup {
     lastSeenUtc: '2026-10-19T08:00:00.000Z',
     eventIds,
     stackFrames: [],
+  };
+}
+
+function bucket(index: number, errorCount: number): UtcBucket {
+  const start = new Date(Date.parse('2026-10-19T08:00:00Z') + index * 300_000).toISOString();
+  const end = new Date(Date.parse(start) + 300_000).toISOString();
+  return {
+    bucketStartUtc: start,
+    bucketEndUtc: end,
+    errorCount,
+    signatureCounts: errorCount === 0 ? {} : { Failure: errorCount },
+    eventIds: [],
+    errorGroupSignatures: errorCount === 0 ? [] : ['Failure'],
+    commitShas: [],
   };
 }
 
@@ -55,5 +70,38 @@ describe('fixed UTC buckets', () => {
     expect(() => buildUtcBuckets([], [], 0)).toThrowError('positive integer');
     expect(() => buildUtcBuckets([], [], 1.5)).toThrowError('positive integer');
     expect(() => buildUtcBuckets([], [], Number.NaN)).toThrowError('positive integer');
+  });
+
+  it('classifies a sharp spike using the fixed thresholds', () => {
+    const analysis = classifyOnset([bucket(0, 1), bucket(1, 1), bucket(2, 6), bucket(3, 0)]);
+    expect(analysis.classification).toBe('spike');
+    expect(analysis.baselineRate).toBe(1);
+    expect(analysis.peakRate).toBe(6);
+    expect(analysis.windowStartUtc).toBe('2026-10-19T08:10:00.000Z');
+    expect(analysis.windowEndUtc).toBe('2026-10-19T08:15:00.000Z');
+    expect(analysis.explanation).toContain('at least 3x');
+  });
+
+  it('classifies a gradual non-decreasing run as a ramp when spike increase is too small', () => {
+    const analysis = classifyOnset([bucket(0, 0), bucket(1, 1), bucket(2, 2), bucket(3, 3)]);
+    expect(analysis.classification).toBe('ramp');
+    expect(analysis.windowStartUtc).toBe('2026-10-19T08:00:00.000Z');
+    expect(analysis.windowEndUtc).toBe('2026-10-19T08:15:00.000Z');
+    expect(analysis.appliedRule).toContain('3-bucket non-decreasing');
+  });
+
+  it('returns none for stable data and insufficient-data without an onset timestamp', () => {
+    const stable = classifyOnset([bucket(0, 1), bucket(1, 1), bucket(2, 1)]);
+    expect(stable.classification).toBe('none');
+    expect(stable.windowStartUtc).toBeNull();
+    const short = classifyOnset([bucket(0, 1), bucket(1, 1)]);
+    expect(short.classification).toBe('insufficient-data');
+    expect(short.windowStartUtc).toBeNull();
+    expect(short.onsetBucket).toBeNull();
+  });
+
+  it('keeps classification and explanation deterministic across repeated calls', () => {
+    const buckets = [bucket(0, 0), bucket(1, 1), bucket(2, 2), bucket(3, 3)];
+    expect(classifyOnset(buckets)).toEqual(classifyOnset([...buckets].reverse()));
   });
 });
