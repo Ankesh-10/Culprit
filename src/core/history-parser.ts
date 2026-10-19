@@ -112,8 +112,14 @@ function parseCommit(value: unknown, source: string, commitRecord: number): GitC
   if (object.subject !== undefined && typeof object.subject !== 'string') {
     throw new HistoryValidationError('subject must be a string when present.', { ...details, field: 'subject' });
   }
+  if (typeof object.message === 'string' && typeof object.subject === 'string' && canonicalWhitespace(object.message) !== canonicalWhitespace(object.subject)) {
+    throw new HistoryValidationError('message and subject must contain the same text when both are present.', { ...details, field: 'subject' });
+  }
   if (!Array.isArray(object.files)) {
     throw new HistoryValidationError('files must be an array.', { ...details, field: 'files' });
+  }
+  if (object.files.length === 0) {
+    throw new HistoryValidationError('files must contain at least one touched file.', { ...details, field: 'files' });
   }
   const files = object.files.map((file, fileIndex) => parseFile(file, source, commitRecord, fileIndex));
   const byPath = new Map<string, ChangedFile>();
