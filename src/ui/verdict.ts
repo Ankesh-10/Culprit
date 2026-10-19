@@ -3,6 +3,11 @@ import type { VerdictFact, VerdictView } from './view-model';
 
 const SCORE_CAPTION = 'rounded for display';
 
+export interface VerdictHandlers {
+  /** Open the suspect drawer for a rank; `opener` is the control that asked for it. */
+  onInspect(rank: number, opener: HTMLElement): void;
+}
+
 /** Three-segment meter; filled segments carry the accent fill, the visible words repeat the band. */
 export function renderConfidenceMeter(view: VerdictView['confidence']): HTMLElement {
   const segments = [1, 2, 3].map((position) =>
@@ -105,7 +110,17 @@ function renderEvidencePreview(lines: readonly string[]): HTMLElement | null {
   ]);
 }
 
-export function renderVerdict(view: VerdictView): HTMLElement {
+function renderActions(handlers: VerdictHandlers): HTMLElement {
+  const inspect = el('button', {
+    className: 'button-secondary',
+    text: 'Inspect evidence',
+    attrs: { type: 'button', 'data-suspect-rank': '1' },
+  });
+  inspect.addEventListener('click', () => handlers.onInspect(1, inspect));
+  return el('div', { className: 'verdict-actions' }, [inspect]);
+}
+
+export function renderVerdict(view: VerdictView, handlers: VerdictHandlers): HTMLElement {
   const headingId = 'verdict-title';
   const main: HTMLElement[] = [el('p', { className: 'verdict-interpretation', text: view.interpretation }), renderHeadline(view)];
   const preview = renderEvidencePreview(view.evidencePreview);
@@ -120,6 +135,7 @@ export function renderVerdict(view: VerdictView): HTMLElement {
       el('div', { className: 'verdict-main' }, main),
       el('div', { className: 'verdict-side' }, [renderFacts(view), renderScoreRow(view)]),
     ]),
+    renderActions(handlers),
     el('p', { className: 'verdict-caveat', text: view.caveat }),
   );
   return el('section', { className: 'verdict', attrs: { 'aria-labelledby': headingId } }, children);

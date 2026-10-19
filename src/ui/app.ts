@@ -3,6 +3,9 @@ import { BUNDLED_CASES, toAnalysisInput } from './cases';
 import type { BundledCase } from './cases';
 import { renderCasePicker } from './case-picker';
 import { clear, el } from './dom';
+import { dismissSuspectDrawer, openSuspectDrawer, updateSuspectDrawer } from './drawer';
+import type { DrawerHandlers } from './drawer';
+import { buildDrawerView } from './drawer-model';
 import { registerLocalFonts } from './fonts';
 import { initialPageState, reducePage, scheduleLoadingBanner } from './state';
 import type { PageEvent, PageState, Scheduler, SettledState } from './state';
@@ -52,6 +55,7 @@ export function mountApp(doc: Document): void {
   const title = required<HTMLElement>(doc, 'result-title');
   const body = required<HTMLElement>(doc, 'result-body');
   const skipTimeline = required<HTMLElement>(doc, 'skip-timeline');
+  const drawer = required<HTMLDialogElement>(doc, 'suspect-drawer');
   const client = createAnalysisClient();
   const sparklines = new Map<string, readonly number[]>();
   registerLocalFonts();
@@ -70,7 +74,24 @@ export function mountApp(doc: Document): void {
   let logPanel: LogLinesPanel | null = null;
   let logOpenerId: string | null = null;
 
+  const drawerHandlers: DrawerHandlers = {
+    onStep: (rank) => {
+      if (activeStream === null) return;
+      const view = buildDrawerView(activeStream, rank);
+      if (view !== null) updateSuspectDrawer(drawer, view, drawerHandlers);
+    },
+  };
+
+  /** Every opener (verdict, lineup, timeline marker) lands here with the control that was activated. */
+  function inspectSuspect(rank: number, opener: HTMLElement | null): void {
+    if (activeStream === null) return;
+    const view = buildDrawerView(activeStream, rank);
+    if (view === null) return;
+    openSuspectDrawer(drawer, view, opener, drawerHandlers, () => title.focus());
+  }
+
   function disposeInvestigation(): void {
+    dismissSuspectDrawer(drawer);
     timelineView?.dispose();
     timelineView = null;
     signaturesView = null;
@@ -154,7 +175,7 @@ export function mountApp(doc: Document): void {
     }
     const view = buildVerdictView(stream);
     if (view === null) return el('p', { text: stream.ranking.interpretation });
-    const parts: HTMLElement[] = [renderVerdict(view)];
+    const parts: HTMLElement[] = [renderVerdict(view, { onInspect: inspectSuspect })];
     const shortlist = buildShortlistView(stream);
     if (shortlist !== null) parts.push(renderShortlist(shortlist));
     parts.push(renderConsidered(buildConsideredRows(stream)));
