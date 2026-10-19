@@ -26,6 +26,9 @@ const DEFAULT_MAX_STACK_LINES = DEFAULT_LOG_LIMITS.maxStackLines;
 const UTC_ASSUMPTION = 'All log and history timestamps are normalized to UTC from their supplied explicit offsets.';
 const SNAPSHOT_ASSUMPTION = 'Analysis uses only the supplied log and history snapshots; no current time, randomness, or external state is consulted.';
 const PHASE_THREE_ASSUMPTION = 'Commit suspect ranking is intentionally deferred to Phase 3; timeline commitShas remain empty.';
+const TIMESTAMP_ASSUMPTION = 'Supplied event timestamps are trusted; delayed ingestion and cross-host clock skew are not corrected.';
+const CAUSALITY_ASSUMPTION = 'Inferred temporal or evidence relationships are prioritization aids, not proof of causality.';
+const WEAK_EVIDENCE_ASSUMPTION = 'Shared dependencies and unmatched repository paths remain weak or competing evidence.';
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -78,7 +81,7 @@ function timelineFromBuckets(buckets: UtcBucket[]): TimelinePoint[] {
 function cloneOnset(onset: OnsetAnalysis, classification: OnsetClass, onsetWindow: OnsetAnalysis['onsetWindow'], explanation: string, appliedRule: string): OnsetAnalysis {
   const onsetBucket = onsetWindow === null
     ? null
-    : onset.buckets.find((bucket) => bucket.bucketStartUtc === onsetWindow.startUtc) ?? null;
+    : onset.buckets.find((bucket) => bucket.bucketStartUtc <= onsetWindow.startUtc && onsetWindow.startUtc < bucket.bucketEndUtc) ?? null;
   return {
     ...onset,
     classification,
@@ -127,13 +130,20 @@ function hasChangedPathEvidence(groups: ErrorGroup[], commits: AnalysisStream['c
   return groups.some((group) => group.stackFrames.some((frame) => frame.filePath !== null && paths.has(frame.filePath)));
 }
 
-function interpretWeakEvidence(onset: OnsetAnalysis, groups: ErrorGroup[], commits: AnalysisStream['commits']): OnsetAnalysis {
+function interpretWeakEvidence(onset: OnsetAnalysis, groups: ErrorGroup[], commits: AnalysisStream['commits'], events: LogEvent[]): OnsetAnalysis {
   const hasTraceEvidence = groups.some((group) => group.stackFrames.length > 0);
   if (onset.classification !== 'none' || groups.length === 0 || !hasTraceEvidence || hasChangedPathEvidence(groups, commits)) return onset;
+  const errorTimes = events
+    .filter((event) => event.level === 'error' || event.level === 'fatal')
+    .map((event) => event.timestampUtc)
+    .sort(compareText);
+  const startUtc = errorTimes[1] ?? errorTimes[0] ?? onset.buckets[0]?.bucketStartUtc;
+  const endUtc = errorTimes.at(-1) ?? onset.buckets.at(-1)?.bucketEndUtc;
+  if (startUtc === undefined || endUtc === undefined) return onset;
   return cloneOnset(
     onset,
     'ambiguous',
-    onset.onsetWindow,
+    { startUtc, endUtc },
     'Ambiguous onset interpretation: error evidence does not overlap a changed repository path, so no clear culprit is established.',
     'ambiguous: no grouped application stack path overlaps the supplied history ranges',
   );
@@ -212,12 +222,15 @@ export function analyze(input: AnalysisInput): AnalysisOutcome {
   const commits = historyResult.value.commits;
   const errors = groupErrorEvents(normalizedEvents);
   const buckets = buildUtcBuckets(normalizedEvents, errors, checked.bucketMinutes);
-  const onset = interpretWeakEvidence(interpretSparseRamp(classifyOnset(buckets)), errors, commits);
+  const onset = interpretWeakEvidence(interpretSparseRamp(classifyOnset(buckets)), errors, commits, normalizedEvents);
   const inputDiagnostics = [...logResult.diagnostics, ...historyResult.diagnostics];
   const diagnostics = parsedDiagnostics(logResult.diagnostics, historyResult.diagnostics);
   const groupWarnings = errors.flatMap((group) => group.warnings ?? []);
-  const warnings = [...new Set([...recoverableWarnings(inputDiagnostics), ...groupWarnings])].sort(compareText);
-  const assumptions = [UTC_ASSUMPTION, SNAPSHOT_ASSUMPTION, PHASE_THREE_ASSUMPTION].sort(compareText);
+  const interpretationWarnings = onset.class === 'ambiguous'
+    ? ['No grouped application stack path overlaps the supplied history files; evidence remains weak or competing.']
+    : [];
+  const warnings = [...new Set([...recoverableWarnings(inputDiagnostics), ...groupWarnings, ...interpretationWarnings])].sort(compareText);
+  const assumptions = [UTC_ASSUMPTION, SNAPSHOT_ASSUMPTION, PHASE_THREE_ASSUMPTION, TIMESTAMP_ASSUMPTION, CAUSALITY_ASSUMPTION, WEAK_EVIDENCE_ASSUMPTION].sort(compareText);
   return {
     ok: true,
     stream: {
