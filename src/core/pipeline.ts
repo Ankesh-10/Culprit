@@ -52,7 +52,7 @@ function optionDiagnostic(code: string, message: string): InputDiagnostic {
   return { source: 'analysis', code: code as InputDiagnostic['code'], message, line: null, record: null, field: null, raw: null };
 }
 
-function invalidOutcome(error: Error, diagnostic: InputDiagnostic): AnalysisOutcome {
+function invalidOutcome(error: AnalysisInputError | CoreInputError, diagnostic: InputDiagnostic): AnalysisOutcome {
   return { ok: false, error, diagnostics: [diagnostic] };
 }
 

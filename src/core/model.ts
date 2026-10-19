@@ -1,4 +1,7 @@
 /** The public result boundary is intentionally JSON-serializable and versioned. */
+import type { CoreInputError } from './input-errors';
+import type { AnalysisInputError } from './buckets';
+
 export const SCHEMA_VERSION = 1 as const;
 export const ANALYSIS_VERSION = 'analysis-v1' as const;
 export const SCORING_VERSION = 'scoring-v1' as const;
@@ -263,4 +266,4 @@ export interface AnalysisStream {
 
 export type AnalysisOutcome =
   | { ok: true; stream: AnalysisStream }
-  | { ok: false; error: Error; diagnostics: import('./input-errors').InputDiagnostic[] };
+  | { ok: false; error: CoreInputError | AnalysisInputError; diagnostics: import('./input-errors').InputDiagnostic[] };
