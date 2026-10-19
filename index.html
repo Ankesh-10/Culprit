@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Culprit: local, deterministic incident analysis" />
+    <title>Culprit · Incident analysis</title>
+  </head>
+  <body>
+    <main id="app" class="shell" aria-labelledby="app-title">
+      <header class="hero">
+        <p class="eyebrow">Local incident console</p>
+        <h1 id="app-title">Culprit</h1>
+        <p class="lede">Find the commits most worth investigating after a production error spike.</p>
+      </header>
+      <section class="status-card" aria-labelledby="status-title">
+        <div>
+          <p class="eyebrow">Foundation ready</p>
+          <h2 id="status-title">Load an incident to begin</h2>
+          <p id="status-copy">The analysis surface is local and offline. No logs or repository data leave this browser.</p>
+        </div>
+        <span class="status-pill" aria-label="Analysis not started">Not started</span>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
