@@ -1,8 +1,4 @@
 import './styles.css';
+import { mountApp } from './ui/app';
 
-const statusCopy = document.querySelector<HTMLElement>('#status-copy');
-
-if (statusCopy) {
-  statusCopy.textContent =
-    'Fixture loading and deterministic analysis will appear here. For now, this shell confirms the local, offline runtime is ready.';
-}
+mountApp(document);
