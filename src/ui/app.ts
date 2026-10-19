@@ -7,8 +7,16 @@ import { registerLocalFonts } from './fonts';
 import { initialPageState, reducePage, scheduleLoadingBanner } from './state';
 import type { PageEvent, PageState, Scheduler, SettledState } from './state';
 import { renderEmptyState, renderErrorState, renderLoadingPlaceholder, renderStatePanel, renderStatus } from './status';
+import { renderConsidered, renderShortlist } from './shortlist';
 import { renderVerdict } from './verdict';
-import { buildStatePanel, buildStatusView, buildVerdictView } from './view-model';
+import {
+  buildConsideredRows,
+  buildShortlistView,
+  buildStatePanel,
+  buildStatusView,
+  buildVerdictView,
+  deriveResultKind,
+} from './view-model';
 import { handleAnalyzeRequest } from '../worker/protocol';
 
 function required<T extends HTMLElement>(doc: Document, id: string): T {
@@ -24,10 +32,20 @@ const timerScheduler: Scheduler = (callback, delayMs) => {
 
 function renderSettled(settled: SettledState): HTMLElement {
   if (settled.phase === 'error') return renderErrorState(settled.failure);
-  const panel = buildStatePanel(settled.stream);
-  if (panel !== null) return renderStatePanel(panel);
-  const view = buildVerdictView(settled.stream);
-  return view === null ? el('p', { text: settled.stream.ranking.interpretation }) : renderVerdict(view);
+  const stream = settled.stream;
+  const panel = buildStatePanel(stream);
+  if (panel !== null) {
+    const parts: HTMLElement[] = [renderStatePanel(panel)];
+    if (deriveResultKind(stream) === 'no-eligible-commits') parts.push(renderConsidered(buildConsideredRows(stream)));
+    return el('div', { className: 'result-stack' }, parts);
+  }
+  const view = buildVerdictView(stream);
+  if (view === null) return el('p', { text: stream.ranking.interpretation });
+  const parts: HTMLElement[] = [renderVerdict(view)];
+  const shortlist = buildShortlistView(stream);
+  if (shortlist !== null) parts.push(renderShortlist(shortlist));
+  parts.push(renderConsidered(buildConsideredRows(stream)));
+  return el('div', { className: 'result-stack' }, parts);
 }
 
 export function mountApp(doc: Document): void {

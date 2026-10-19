@@ -1,7 +1,22 @@
 import { CONFIDENCE_LABEL_ORDER } from '../core/model';
-import type { AnalysisStream, ConfidenceBand, ConfidenceLabel, EvidenceReference, ScoredSuspect } from '../core/model';
+import type {
+  AnalysisStream,
+  CommitDispositionStatus,
+  ConfidenceBand,
+  ConfidenceLabel,
+  EvidenceReference,
+  ScoredSuspect,
+} from '../core/model';
 import { toAnalysisResult } from '../core/pipeline';
-import { formatPathRange, formatScore, formatTimeGap, formatUtcDateTime, plural, traceMatchLabel } from './format';
+import {
+  formatGapShort,
+  formatPathRange,
+  formatScore,
+  formatTimeGap,
+  formatUtcDateTime,
+  plural,
+  traceMatchLabel,
+} from './format';
 import type { PageState } from './state';
 
 export type ResultKind = 'completed' | 'low-confidence' | 'no-incident' | 'insufficient-data' | 'no-eligible-commits';
@@ -176,12 +191,50 @@ export interface ConsideredRow {
   reason: string;
 }
 
-export function buildShortlistView(_stream: AnalysisStream): ShortlistView | null {
-  throw new Error('not implemented');
+const EM_DASH = '—';
+const MIDDLE_DOT = '·';
+
+export function buildShortlistView(stream: AnalysisStream): ShortlistView | null {
+  const suspects = toAnalysisResult(stream).suspects;
+  if (suspects.length === 0) return null;
+  const rows = suspects.map((suspect, index): ShortlistRow => {
+    const leading = index === 0;
+    return {
+      rank: suspect.rank,
+      rankLabel: `#${suspect.rank}`,
+      leading,
+      diamond: leading ? 'leading' : 'ranked',
+      shortSha: suspect.shortSha,
+      subject: suspect.subject,
+      byline: `${suspect.author} ${MIDDLE_DOT} ${formatUtcDateTime(suspect.committedAtUtc)}`,
+      gap: formatGapShort(suspect.timeGapMinutes),
+      scoreText: formatScore(suspect.score, 2),
+      scoreFraction: clamp01(suspect.score),
+      traceChip: traceMatchLabel(suspect.traceSummary.matchKind),
+      matches: matchesText(suspect),
+    };
+  });
+  return { heading: 'Suspect lineup', countText: plural(rows.length, 'suspect'), rows };
 }
 
-export function buildConsideredRows(_stream: AnalysisStream): { summary: string; rows: ConsideredRow[] } {
-  throw new Error('not implemented');
+const DISPOSITION_STATUS: Record<CommitDispositionStatus, ConsideredRow['status']> = {
+  'top-three': 'Top three',
+  scored: 'Scored',
+  excluded: 'Excluded',
+};
+
+export function buildConsideredRows(stream: AnalysisStream): { summary: string; rows: ConsideredRow[] } {
+  const rows = toAnalysisResult(stream).ranking.considered.map(
+    (entry): ConsideredRow => ({
+      rank: entry.rank === null ? EM_DASH : String(entry.rank),
+      shortSha: entry.shortSha,
+      subject: entry.subject,
+      status: DISPOSITION_STATUS[entry.status],
+      score: entry.score === null ? EM_DASH : formatScore(entry.score, 2),
+      reason: entry.reason ?? '',
+    }),
+  );
+  return { summary: `Commits considered (${rows.length})`, rows };
 }
 
 export type StatusIcon = 'info' | 'loader' | 'x-circle' | 'alert-triangle' | 'check-circle';

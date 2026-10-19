@@ -655,6 +655,171 @@ a { color: var(--color-ink); text-decoration: underline; }
   line-height: var(--leading-label);
 }
 
+/* Suspect lineup */
+
+.result-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.lineup-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.lineup-title-row h2 { margin: 0; }
+
+.lineup-count {
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.lineup-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 640px) {
+  .lineup-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-lg); }
+}
+
+@media (min-width: 1024px) {
+  .lineup-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.lineup-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-raised);
+}
+
+@media (min-width: 640px) {
+  .lineup-card { padding: var(--space-lg); }
+}
+
+.lineup-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.rank-diamond { width: 16px; height: 16px; }
+.rank-diamond.is-leading { color: var(--viz-suspect); }
+.rank-diamond.is-ranked { color: var(--viz-context); }
+
+.rank-label {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-heading);
+}
+
+.leading-tag { margin-left: auto; color: var(--color-ink); }
+
+.lineup-card p { margin: 0; }
+
+.lineup-hash {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-semibold);
+}
+
+.lineup-subject {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.lineup-byline,
+.lineup-gap,
+.lineup-matches {
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.lineup-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: auto;
+}
+
+/* Commits considered */
+
+.considered {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.considered summary {
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--color-border);
+}
+
+.considered-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.considered-table th,
+.considered-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.considered-table th {
+  color: var(--color-ink-2);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.considered-table .col-number {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.considered-table .col-mono { font-family: var(--font-mono); white-space: nowrap; }
+.considered-table .col-subject { min-width: 200px; overflow-wrap: anywhere; }
+.considered-table .col-reason { min-width: 220px; overflow-wrap: anywhere; }
+
+@media (max-width: 639px) {
+  .considered-table th:first-child,
+  .considered-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--color-surface);
+  }
+}
+
 /* Forced colors keep outlines, rules and icons visible. */
 
 @media (forced-colors: active) {
@@ -672,6 +837,9 @@ a { color: var(--color-ink); text-decoration: underline; }
 
   .meter-segment,
   .score-meter { border: 1px solid CanvasText; }
+
+  .lineup-card,
+  .considered { border: 1px solid CanvasText; }
 
   .meter-segment.is-filled,
   .score-fill { background: Highlight; forced-color-adjust: none; }
