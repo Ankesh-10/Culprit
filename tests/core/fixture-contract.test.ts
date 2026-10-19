@@ -223,13 +223,35 @@ function buildTracerResult(
         author: stringField(commit, 'author'),
         committedAtUtc: timestamp,
         score,
+        timeGapMinutes: 0,
+        traceSummary: { matchKind: 'none' as const, matchedErrorCount: 0, lineLevelErrorCount: 0, totalErrorCount: errorCount },
         signals: [],
         evidenceReferences: index === 0 ? evidenceReferences : [],
         tieBreakKey: `${score}|${timestamp}|${sha}`,
       };
     }),
+    ranking: {
+      status: 'ranked',
+      referenceUtc: stringField(expectedOnset, 'windowStartUtc'),
+      eligibleCount: commits.length,
+      considered: commits.map((commit, index) => {
+        const sha = stringField(commit, 'sha');
+        return {
+          sha,
+          shortSha: sha.slice(0, 7),
+          subject: stringField(commit, 'subject'),
+          author: stringField(commit, 'author'),
+          committedAtUtc: stringField(commit, 'timestamp'),
+          status: 'top-three' as const,
+          rank: index + 1,
+          score: 1 / (index + 1),
+          reason: null,
+        };
+      }),
+    },
     confidence: {
       band: stringField(expected, 'confidence') as AnalysisResult['confidence']['band'],
+      labels: stringField(expected, 'confidence') === 'low' ? ['low-confidence' as const] : [],
       rationale: caveats.join(' '),
       scoreSeparation: null,
       evidenceCompleteness: 1,

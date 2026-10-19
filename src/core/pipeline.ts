@@ -6,6 +6,7 @@ import type {
   Diagnostic,
   ErrorGroup,
   LogEvent,
+  GitCommit,
   OnsetAnalysis,
   OnsetClass,
   TimelinePoint,
@@ -16,8 +17,9 @@ import { DEFAULT_LOG_LIMITS, parseLog } from './log-parser';
 import { parseHistoryExport } from './history-parser';
 import { groupErrorEvents } from './signatures';
 import { classifyOnset } from './onset';
-import { normalizeRepositoryPath } from './normalization';
-import { UnsupportedFormatError, type InputDiagnostic, type CoreInputError } from './input-errors';
+import { compareText, normalizeRepositoryPath } from './normalization';
+import { rankSuspects } from './ranking';
+import { CoreInputError, UnsupportedFormatError, type InputDiagnostic } from './input-errors';
 
 const DEFAULT_MAX_LOG_BYTES = DEFAULT_LOG_LIMITS.maxLogBytes;
 const DEFAULT_MAX_EVENTS = DEFAULT_LOG_LIMITS.maxEvents;
@@ -25,14 +27,12 @@ const DEFAULT_MAX_STACK_LINES = DEFAULT_LOG_LIMITS.maxStackLines;
 
 const UTC_ASSUMPTION = 'All log and history timestamps are normalized to UTC from their supplied explicit offsets.';
 const SNAPSHOT_ASSUMPTION = 'Analysis uses only the supplied log and history snapshots; no current time, randomness, or external state is consulted.';
-const PHASE_THREE_ASSUMPTION = 'Commit suspect ranking is intentionally deferred to Phase 3; timeline commitShas remain empty.';
 const TIMESTAMP_ASSUMPTION = 'Supplied event timestamps are trusted; delayed ingestion and cross-host clock skew are not corrected.';
 const CAUSALITY_ASSUMPTION = 'Inferred temporal or evidence relationships are prioritization aids, not proof of causality.';
 const WEAK_EVIDENCE_ASSUMPTION = 'Shared dependencies and unmatched repository paths remain weak or competing evidence.';
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
+const SCORING_ASSUMPTION = 'Commits are scored with frozen weights (proximity 0.35, trace match 0.30, novelty 0.25, churn 0.10); the score is ranked suspicion, not a probability.';
+const NOVELTY_ASSUMPTION = 'The start of the supplied log is treated as the start of observation, so a signature absent before the log begins counts as new.';
+const TRACE_SCOPE_ASSUMPTION = 'Only the first application-owned stack frame of each error event is scored; vendor, runtime, build-output and absolute-path frames contribute no trace evidence.';
 
 function diagnosticOrder(left: InputDiagnostic, right: InputDiagnostic): number {
   const sourceOrder = compareText(left.source, right.source);
@@ -68,14 +68,23 @@ function sourceName(value: string | undefined, fallback: string): string {
   }
 }
 
-function timelineFromBuckets(buckets: UtcBucket[]): TimelinePoint[] {
-  return buckets.map((bucket) => ({
-    bucketStartUtc: bucket.bucketStartUtc,
-    bucketEndUtc: bucket.bucketEndUtc,
-    errorCount: bucket.errorCount,
-    errorGroupSignatures: [...bucket.errorGroupSignatures],
-    commitShas: [],
-  }));
+/** Commit lanes use the same half-open membership as events: `bucketStart <= commit < bucketEnd`. */
+function timelineFromBuckets(buckets: UtcBucket[], commits: readonly GitCommit[]): TimelinePoint[] {
+  const stamped = commits.map((commit) => ({ sha: commit.sha, epoch: Date.parse(commit.timestampUtc) }));
+  return buckets.map((bucket) => {
+    const start = Date.parse(bucket.bucketStartUtc);
+    const end = Date.parse(bucket.bucketEndUtc);
+    return {
+      bucketStartUtc: bucket.bucketStartUtc,
+      bucketEndUtc: bucket.bucketEndUtc,
+      errorCount: bucket.errorCount,
+      errorGroupSignatures: [...bucket.errorGroupSignatures],
+      commitShas: stamped
+        .filter((commit) => commit.epoch >= start && commit.epoch < end)
+        .map((commit) => commit.sha)
+        .sort(compareText),
+    };
+  });
 }
 
 function cloneOnset(onset: OnsetAnalysis, classification: OnsetClass, onsetWindow: OnsetAnalysis['onsetWindow'], explanation: string, appliedRule: string): OnsetAnalysis {
@@ -229,8 +238,16 @@ export function analyze(input: AnalysisInput): AnalysisOutcome {
   const normalizedEvents = logResult.value.events;
   const commits = historyResult.value.commits;
   const errors = groupErrorEvents(normalizedEvents);
-  const buckets = buildUtcBuckets(normalizedEvents, errors, checked.bucketMinutes);
+  let buckets: UtcBucket[];
+  try {
+    buckets = buildUtcBuckets(normalizedEvents, errors, checked.bucketMinutes);
+  } catch (error) {
+    if (error instanceof CoreInputError) return { ok: false, error, diagnostics: [error.toDiagnostic()] };
+    if (error instanceof AnalysisInputError) return invalidOutcome(error, optionDiagnostic('INVALID_ANALYSIS_INPUT', error.message));
+    throw error;
+  }
   const onset = interpretWeakEvidence(interpretSparseRamp(classifyOnset(buckets)), errors, commits, normalizedEvents);
+  const ranking = rankSuspects({ commits, events: normalizedEvents, errors, onset });
   const inputDiagnostics = [...logResult.diagnostics, ...historyResult.diagnostics];
   const diagnostics = parsedDiagnostics(logResult.diagnostics, historyResult.diagnostics);
   const groupWarnings = errors.flatMap((group) => group.warnings ?? []);
@@ -238,7 +255,16 @@ export function analyze(input: AnalysisInput): AnalysisOutcome {
     ? ['No grouped application stack path overlaps the supplied history files; evidence remains weak or competing.']
     : [];
   const warnings = [...new Set([...recoverableWarnings(inputDiagnostics), ...groupWarnings, ...interpretationWarnings])].sort(compareText);
-  const assumptions = [UTC_ASSUMPTION, SNAPSHOT_ASSUMPTION, PHASE_THREE_ASSUMPTION, TIMESTAMP_ASSUMPTION, CAUSALITY_ASSUMPTION, WEAK_EVIDENCE_ASSUMPTION].sort(compareText);
+  const assumptions = [
+    UTC_ASSUMPTION,
+    SNAPSHOT_ASSUMPTION,
+    SCORING_ASSUMPTION,
+    NOVELTY_ASSUMPTION,
+    TRACE_SCOPE_ASSUMPTION,
+    TIMESTAMP_ASSUMPTION,
+    CAUSALITY_ASSUMPTION,
+    WEAK_EVIDENCE_ASSUMPTION,
+  ].sort(compareText);
   return {
     ok: true,
     stream: {
@@ -258,8 +284,9 @@ export function analyze(input: AnalysisInput): AnalysisOutcome {
       commits,
       errors,
       buckets,
-      timeline: timelineFromBuckets(buckets),
+      timeline: timelineFromBuckets(buckets, commits),
       onset,
+      ranking,
       warnings,
       assumptions,
       diagnostics,
@@ -267,25 +294,7 @@ export function analyze(input: AnalysisInput): AnalysisOutcome {
   };
 }
 
-function incidentInterpretation(onset: OnsetClass): string {
-  if (onset === 'spike') return 'A sharp UTC error-rate change was detected; investigate pre-onset evidence after Phase 3 ranking.';
-  if (onset === 'ramp') return 'A gradual UTC error-rate change was detected; the window is evidence, not a proven causal moment.';
-  if (onset === 'ambiguous') return 'No clear culprit is established because the available evidence is weak or competing.';
-  if (onset === 'insufficient-data') return 'Insufficient supplied data to infer an incident onset.';
-  return 'No statistically meaningful incident pattern was detected in the supplied snapshot.';
-}
-
-function confidenceFor(onset: OnsetClass): AnalysisResult['confidence'] {
-  const band = onset === 'spike' ? 'medium' : 'low';
-  return {
-    band,
-    rationale: 'Phase 3 suspect ranking is intentionally empty; this result reports deterministic input evidence and onset only.',
-    scoreSeparation: null,
-    evidenceCompleteness: 0,
-  };
-}
-
-/** Adapt a Phase 2 stream to the stable Phase 1 result/serializer contract. */
+/** Project an analysis stream, including its ranking, onto the stable result/serializer contract. */
 export function toAnalysisResult(stream: AnalysisStream): AnalysisResult {
   const onsetSummary = {
     class: stream.onset.class,
@@ -306,7 +315,7 @@ export function toAnalysisResult(stream: AnalysisStream): AnalysisResult {
     diagnostics: stream.diagnostics.map((diagnostic) => ({ ...diagnostic })),
     incident: {
       status: stream.onset.class,
-      interpretation: incidentInterpretation(stream.onset.class),
+      interpretation: stream.ranking.interpretation,
       onset: onsetSummary,
     },
     errors: stream.errors.map((group) => ({
@@ -317,9 +326,23 @@ export function toAnalysisResult(stream: AnalysisStream): AnalysisResult {
       ...(group.warnings === undefined ? {} : { warnings: [...group.warnings] }),
       ...(group.diagnostics === undefined ? {} : { diagnostics: [...group.diagnostics] }),
     })),
-    timeline: stream.timeline.map((point) => ({ ...point, errorGroupSignatures: [...point.errorGroupSignatures], commitShas: [] })),
-    suspects: [],
-    confidence: confidenceFor(stream.onset.class),
+    timeline: stream.timeline.map((point) => ({ ...point, errorGroupSignatures: [...point.errorGroupSignatures], commitShas: [...point.commitShas] })),
+    suspects: stream.ranking.suspects.map((suspect) => ({
+      ...suspect,
+      traceSummary: { ...suspect.traceSummary },
+      signals: suspect.signals.map((signal) => ({
+        ...signal,
+        evidenceReferences: signal.evidenceReferences.map((reference) => ({ ...reference })),
+      })),
+      evidenceReferences: suspect.evidenceReferences.map((reference) => ({ ...reference })),
+    })),
+    ranking: {
+      status: stream.ranking.status,
+      referenceUtc: stream.ranking.referenceUtc,
+      eligibleCount: stream.ranking.eligibleCount,
+      considered: stream.ranking.considered.map((entry) => ({ ...entry })),
+    },
+    confidence: { ...stream.ranking.confidence, labels: [...stream.ranking.confidence.labels] },
     tieBreak: {
       rule: 'score descending, trace match descending, commit time descending, SHA ascending',
       appliedOrder: ['score', 'trace-match', 'committedAtUtc', 'sha'],

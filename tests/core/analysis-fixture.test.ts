@@ -38,6 +38,9 @@ describe('shared fixture analysis contract', () => {
 
     expect(manifest.id).toBe(fixtureId);
     expect(stream.onset.classification).toBe(manifest.expected.onsetClass);
+    expect(stream.ranking.status).toBe('ranked');
+    const prose = [...stream.assumptions, ...stream.warnings, stream.ranking.interpretation, stream.ranking.confidence.rationale].join(' ');
+    expect(prose).not.toMatch(/Phase 3|deferred/i);
     expect(stream.normalizedEvents.length).toBeGreaterThan(0);
     expect(stream.commits.length).toBeGreaterThanOrEqual(3);
     expect(stream.warnings.concat(stream.assumptions, stream.diagnostics.map((diagnostic) => diagnostic.message)).join(' ')).toMatch(/UTC|timestamp/i);
@@ -50,7 +53,7 @@ describe('shared fixture analysis contract', () => {
       if (evidence === 'gradual-error-rate-ramp') expect(stream.onset.classification).toBe('ramp');
       if (evidence === 'competing-pre-onset-commits') expect(stream.commits.length).toBeGreaterThanOrEqual(2);
       if (evidence === 'weak-trace-evidence') expect(outputText).toMatch(/weak|competing|unmatched/i);
-      if (evidence === 'low-confidence-rationale') expect(outputText).toMatch(/weak|competing|Phase 3/i);
+      if (evidence === 'low-confidence-rationale') expect(outputText).toMatch(/weak|competing/i);
     }
 
     const caveatText = stream.warnings.concat(stream.assumptions, stream.diagnostics.map((diagnostic) => diagnostic.message)).join(' ');

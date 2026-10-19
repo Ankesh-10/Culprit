@@ -1,8 +1,13 @@
 import type { ErrorGroup, LogEvent, UtcBucket } from './model';
+import { InputLimitError } from './input-errors';
+import { compareText } from './normalization';
 
 export type { UtcBucket } from './model';
 
 export const DEFAULT_BUCKET_MINUTES = 5;
+
+/** Upper bound on allocated buckets so a caller-controlled timestamp span cannot exhaust memory. */
+export const MAX_BUCKETS = 10_000;
 
 /** A typed failure for an invalid deterministic analysis option. */
 export class AnalysisInputError extends Error {
@@ -12,10 +17,6 @@ export class AnalysisInputError extends Error {
     super(message);
     this.name = 'AnalysisInputError';
   }
-}
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function timestampForEpoch(epoch: number): string {
@@ -67,6 +68,13 @@ export function buildUtcBuckets(
   if (firstEpoch === undefined || lastEpoch === undefined) return [];
   const firstBucketEpoch = Math.floor(firstEpoch / widthMs) * widthMs;
   const lastBucketEpoch = Math.floor(lastEpoch / widthMs) * widthMs;
+  const bucketCount = (lastBucketEpoch - firstBucketEpoch) / widthMs + 1;
+  if (bucketCount > MAX_BUCKETS) {
+    throw new InputLimitError(
+      `The log spans ${bucketCount} UTC buckets of ${bucketMinutes} minute(s), which exceeds the limit of ${MAX_BUCKETS}; supply a shorter time range or a wider bucket.`,
+      { source: 'logs' },
+    );
+  }
   const buckets = new Map<number, UtcBucket>();
   for (let start = firstBucketEpoch; start <= lastBucketEpoch; start += widthMs) {
     buckets.set(start, emptyBucket(start, widthMs));

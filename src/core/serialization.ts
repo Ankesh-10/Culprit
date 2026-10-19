@@ -1,22 +1,22 @@
 import type {
   AnalysisResult,
+  CommitDisposition,
   Diagnostic,
   EvidenceReference,
   ErrorGroup,
+  RankingSummary,
   ScoredSuspect,
   SignalContribution,
   StackFrame,
   TimelinePoint,
+  TraceSummary,
 } from './model';
-import { normalizeRepositoryPath, normalizeTimestampUtc } from './normalization';
+import { CONFIDENCE_LABEL_ORDER } from './model';
+import { compareText, normalizeRepositoryPath, normalizeTimestampUtc } from './normalization';
+import { escapeMarkdown, inlineCode } from './markdown';
+import { SIGNAL_ORDER } from './scoring';
 
 export { normalizeRepositoryPath } from './normalization';
-
-const SIGNAL_ORDER: SignalContribution['signal'][] = ['proximity', 'trace-match', 'novelty', 'churn'];
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
 
 function finiteNumber(value: number, label: string): number {
   if (!Number.isFinite(value)) {
@@ -98,6 +98,15 @@ function canonicalSignal(signal: SignalContribution): SignalContribution {
   };
 }
 
+function canonicalTraceSummary(summary: TraceSummary): TraceSummary {
+  return {
+    matchKind: summary.matchKind,
+    matchedErrorCount: finiteNumber(summary.matchedErrorCount, 'matched error count'),
+    lineLevelErrorCount: finiteNumber(summary.lineLevelErrorCount, 'line-level error count'),
+    totalErrorCount: finiteNumber(summary.totalErrorCount, 'total error count'),
+  };
+}
+
 function canonicalSuspect(suspect: ScoredSuspect): ScoredSuspect {
   return {
     rank: finiteNumber(suspect.rank, 'suspect rank'),
@@ -107,11 +116,38 @@ function canonicalSuspect(suspect: ScoredSuspect): ScoredSuspect {
     author: suspect.author,
     committedAtUtc: utcTimestamp(suspect.committedAtUtc, 'committedAtUtc'),
     score: finiteNumber(suspect.score, 'suspect score'),
+    timeGapMinutes: finiteNumber(suspect.timeGapMinutes, 'time gap minutes'),
+    traceSummary: canonicalTraceSummary(suspect.traceSummary),
     signals: [...suspect.signals]
       .sort((left, right) => SIGNAL_ORDER.indexOf(left.signal) - SIGNAL_ORDER.indexOf(right.signal))
       .map(canonicalSignal),
     evidenceReferences: canonicalEvidenceList(suspect.evidenceReferences),
     tieBreakKey: suspect.tieBreakKey,
+  };
+}
+
+function canonicalDisposition(entry: CommitDisposition): CommitDisposition {
+  return {
+    sha: entry.sha,
+    shortSha: entry.shortSha,
+    subject: entry.subject,
+    author: entry.author,
+    committedAtUtc: utcTimestamp(entry.committedAtUtc, 'committedAtUtc'),
+    status: entry.status,
+    rank: entry.rank === null ? null : finiteNumber(entry.rank, 'disposition rank'),
+    score: entry.score === null ? null : finiteNumber(entry.score, 'disposition score'),
+    reason: entry.reason,
+  };
+}
+
+function canonicalRanking(ranking: RankingSummary): RankingSummary {
+  return {
+    status: ranking.status,
+    referenceUtc: ranking.referenceUtc === null ? null : utcTimestamp(ranking.referenceUtc, 'ranking referenceUtc'),
+    eligibleCount: finiteNumber(ranking.eligibleCount, 'eligible count'),
+    considered: ranking.considered
+      .map(canonicalDisposition)
+      .sort((left, right) => compareText(left.committedAtUtc, right.committedAtUtc) || compareText(left.sha, right.sha)),
   };
 }
 
@@ -129,7 +165,9 @@ function canonicalDiagnostic(diagnostic: Diagnostic): Diagnostic {
  * Build a stable object in documented order, then stringify it.
  * Arrays are ordered as follows: diagnostics/warnings/assumptions lexically,
  * errors by signature, timeline by bucket start, suspects by rank, signals by
- * the frozen signal order, and evidence by its complete reference key.
+ * the frozen signal order, evidence by its complete reference key, confidence
+ * labels by the fixed label order, and considered commits by committed time then SHA.
+ * Suspect, ranking and disposition keys are emitted in their declared order.
  * Optional data uses null rather than omission. Numbers reject non-finite values.
  */
 export function canonicalizeResult(result: AnalysisResult): AnalysisResult {
@@ -179,8 +217,10 @@ export function canonicalizeResult(result: AnalysisResult): AnalysisResult {
     errors,
     timeline,
     suspects,
+    ranking: canonicalRanking(result.ranking),
     confidence: {
       band: result.confidence.band,
+      labels: CONFIDENCE_LABEL_ORDER.filter((label) => result.confidence.labels.includes(label)),
       rationale: result.confidence.rationale,
       scoreSeparation: result.confidence.scoreSeparation === null ? null : finiteNumber(result.confidence.scoreSeparation, 'score separation'),
       evidenceCompleteness: finiteNumber(result.confidence.evidenceCompleteness, 'evidence completeness'),
@@ -200,8 +240,20 @@ function markdownEvidence(references: EvidenceReference[]): string[] {
   if (references.length === 0) return ['- No direct evidence reference recorded.'];
   return canonicalEvidenceList(references).map((reference) => {
     const location = reference.path === null ? reference.sourceId : `${reference.path}${reference.lineStart === null ? '' : `:${reference.lineStart}${reference.lineEnd === null || reference.lineEnd === reference.lineStart ? '' : `-${reference.lineEnd}`}`}`;
-    return `- ${reference.type}: \`${location}\` — ${reference.detail}`;
+    return `- ${reference.type}: ${inlineCode(location)} — ${escapeMarkdown(reference.detail)}`;
   });
+}
+
+function markdownDispositions(ranking: RankingSummary): string[] {
+  const lines: string[] = [];
+  for (const entry of ranking.considered) {
+    if (entry.status === 'scored') {
+      lines.push(`- Also scored: #${entry.rank ?? 0} ${inlineCode(entry.shortSha)} — ${escapeMarkdown(entry.subject)} — score ${entry.score ?? 0}`);
+    } else if (entry.status === 'excluded') {
+      lines.push(`- Not eligible: ${inlineCode(entry.shortSha)} — ${escapeMarkdown(entry.subject)} — ${escapeMarkdown(entry.reason ?? 'excluded from ranking')}`);
+    }
+  }
+  return lines;
 }
 
 /** Project only structured result data into a fixed-order, UTC-explicit report. */
@@ -214,28 +266,48 @@ export function serializeMarkdown(result: AnalysisResult): string {
         `- Class: **${onset.class}**`,
         `- Window (UTC): ${onset.windowStartUtc ?? 'unknown'} → ${onset.windowEndUtc ?? 'unknown'}`,
         `- Baseline / peak rate: ${onset.baselineRate} / ${onset.peakRate}`,
-        `- Explanation: ${onset.explanation}`,
+        `- Explanation: ${escapeMarkdown(onset.explanation)}`,
       ];
-  const suspectLines = canonical.suspects.length === 0
-    ? ['- No eligible suspect commits were scored.']
-    : canonical.suspects.map((suspect) => `- #${suspect.rank} \`${suspect.shortSha}\` — ${suspect.subject} (${suspect.score.toFixed(3)} suspicion)`);
+  const leader = canonical.suspects[0];
+  const verdictLines = [
+    `- Interpretation: ${escapeMarkdown(canonical.incident.interpretation)}`,
+    `- Confidence: **${canonical.confidence.band}**`,
+    `- Labels: ${canonical.confidence.labels.length === 0 ? 'none' : canonical.confidence.labels.join(', ')}`,
+    ...(leader === undefined
+      ? []
+      : [`- Leading suspect: ${inlineCode(leader.shortSha)} — ${escapeMarkdown(leader.subject)} — ${escapeMarkdown(leader.author)}, committed ${leader.committedAtUtc}, ${leader.timeGapMinutes} min before the onset window start`]),
+    '- Scores are ranked suspicion, not probability or proof of causality.',
+  ];
+  const suspectLines = [
+    ...(canonical.suspects.length === 0 ? ['- No eligible suspect commits were scored.'] : []),
+    ...canonical.suspects.map((suspect) => `- #${suspect.rank} ${inlineCode(suspect.shortSha)} — ${escapeMarkdown(suspect.subject)} — ${escapeMarkdown(suspect.author)}, committed ${suspect.committedAtUtc}, ${suspect.timeGapMinutes} min before onset window start — score ${suspect.score}`),
+    ...markdownDispositions(canonical.ranking),
+  ];
   const evidenceLines = canonical.suspects.flatMap((suspect) => [
-    `### ${suspect.shortSha} · ${suspect.subject}`,
+    `### #${suspect.rank} ${inlineCode(suspect.shortSha)} · ${escapeMarkdown(suspect.subject)}`,
     ...markdownEvidence(suspect.evidenceReferences),
-    ...suspect.signals.map((signal) => `- ${signal.signal}: ${signal.explanation} (value ${signal.value}, contribution ${signal.contribution})`),
+    ...suspect.signals.map((signal) => `- ${signal.signal}: value ${signal.value} × weight ${signal.weight} = contribution ${signal.contribution} — ${escapeMarkdown(signal.explanation)}`),
+    `- Total score: ${suspect.score} (sum of the contributions above)`,
   ]);
   const warningLines = [
-    ...canonical.warnings.map((warning) => `- Warning: ${warning}`),
-    ...canonical.diagnostics.map((diagnostic) => `- Diagnostic [${diagnostic.source}/${diagnostic.code}]${diagnostic.line === null ? '' : ` line ${diagnostic.line}`}: ${diagnostic.message}`),
+    ...canonical.warnings.map((warning) => `- Warning: ${escapeMarkdown(warning)}`),
+    ...canonical.diagnostics.map((diagnostic) => `- Diagnostic ${inlineCode(`${diagnostic.source}/${diagnostic.code}`)}${diagnostic.line === null ? '' : ` line ${diagnostic.line}`}: ${escapeMarkdown(diagnostic.message)}`),
+  ];
+  const caveatLines = [
+    `- Rationale: ${escapeMarkdown(canonical.confidence.rationale)}`,
+    `- Score separation: ${canonical.confidence.scoreSeparation ?? 'not available'}`,
+    `- Evidence completeness: ${canonical.confidence.evidenceCompleteness}`,
+    `- Ranking: ${canonical.ranking.status}; eligible commits: ${canonical.ranking.eligibleCount}; reference (UTC): ${canonical.ranking.referenceUtc ?? 'none'}`,
+    ...canonical.assumptions.map((assumption) => `- Assumption: ${escapeMarkdown(assumption)}`),
   ];
   const sections = [
     '# Culprit analysis',
-    `## Verdict\n- Interpretation: ${canonical.incident.interpretation}\n- Confidence: **${canonical.confidence.band}**`,
+    `## Verdict\n${verdictLines.join('\n')}`,
     `## Onset\n${onsetLines.join('\n')}`,
     `## Top suspects\n${suspectLines.join('\n')}`,
     `## Evidence\n${evidenceLines.length === 0 ? '- No suspect evidence recorded.' : evidenceLines.join('\n')}`,
-    `## Confidence and caveats\n- Rationale: ${canonical.confidence.rationale}\n- Score separation: ${canonical.confidence.scoreSeparation ?? 'not available'}\n- Evidence completeness: ${canonical.confidence.evidenceCompleteness}`,
-    `## Provenance\n- Logs: \`${canonical.provenance.logSource}\` (${canonical.provenance.logFormat}, ${canonical.provenance.eventCount} events)\n- History: \`${canonical.provenance.historySource}\` (${canonical.provenance.historyFormat}, ${canonical.provenance.commitCount} commits)\n- Analysis: ${canonical.analysisVersion}; scoring: ${canonical.scoringVersion}; schema: ${canonical.schemaVersion}`,
+    `## Confidence and caveats\n${caveatLines.join('\n')}`,
+    `## Provenance\n- Logs: ${inlineCode(canonical.provenance.logSource)} (${canonical.provenance.logFormat}, ${canonical.provenance.eventCount} events)\n- History: ${inlineCode(canonical.provenance.historySource)} (${canonical.provenance.historyFormat}, ${canonical.provenance.commitCount} commits)\n- Analysis: ${canonical.analysisVersion}; scoring: ${canonical.scoringVersion}; schema: ${canonical.schemaVersion}`,
     `## UTC disclosure\nAll timestamps in this report are normalized to UTC and rendered with an explicit \`Z\` suffix. The result contains no wall-clock generation time.`,
     `## Warnings and diagnostics\n${warningLines.length === 0 ? '- None.' : warningLines.join('\n')}`,
   ];
