@@ -1,5 +1,7 @@
-import type { AnalysisStream, ConfidenceBand } from '../core/model';
+import { CONFIDENCE_LABEL_ORDER } from '../core/model';
+import type { AnalysisStream, ConfidenceBand, ConfidenceLabel, EvidenceReference, ScoredSuspect } from '../core/model';
 import { toAnalysisResult } from '../core/pipeline';
+import { formatPathRange, formatScore, formatTimeGap, formatUtcDateTime, plural, traceMatchLabel } from './format';
 import type { PageState } from './state';
 
 export type ResultKind = 'completed' | 'low-confidence' | 'no-incident' | 'insufficient-data' | 'no-eligible-commits';
@@ -17,6 +19,15 @@ export function deriveResultKind(stream: AnalysisStream): ResultKind {
   return 'completed';
 }
 
+export interface VerdictFact {
+  key: 'author' | 'committed' | 'gap' | 'onset' | 'files' | 'matches';
+  label: string;
+  value: string;
+  values?: string[];
+  moreCount?: number;
+  mono?: boolean;
+}
+
 export interface VerdictView {
   heading: string;
   confidence: {
@@ -24,18 +35,75 @@ export interface VerdictView {
     filled: number;
     text: string;
     ariaLabel: string;
+    hasLabels: boolean;
   };
+  caution: { lead: string; chips: string[] } | null;
   headline: {
     mode: 'suspect' | 'no-clear-culprit';
     shortSha: string;
     subject: string;
   };
   interpretation: string;
+  facts: VerdictFact[];
+  traceChip: string;
+  score: { value: number; text: string; fraction: number };
+  scoreHelper: string;
+  evidencePreview: string[];
   caveat: string;
 }
 
 const FILLED: Record<ConfidenceBand, number> = { high: 3, medium: 2, low: 1 };
 const BAND_WORD: Record<ConfidenceBand, string> = { high: 'High', medium: 'Medium', low: 'Low' };
+
+export const CAUTION_LEAD = 'Low confidence. Treat these as leads to check, not a diagnosis.';
+export const SCORE_HELPER = 'Suspicion score from 0 to 1. This is ranked suspicion, not probability.';
+export const NO_RANGES_TEXT = 'No changed line ranges recorded';
+
+const LABEL_CHIP: Record<ConfidenceLabel, string> = {
+  'low-confidence': 'Low confidence',
+  ambiguous: 'Ambiguous',
+  'weak-evidence': 'Weak evidence',
+  'no-clear-culprit': 'No clear culprit',
+};
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function matchesText(suspect: ScoredSuspect): string {
+  const { matchedErrorCount, totalErrorCount } = suspect.traceSummary;
+  return `Matches ${matchedErrorCount} of ${plural(totalErrorCount, 'error')}`;
+}
+
+/** Unique file-range references with a path, in evidence order. */
+function uniqueFileRanges(references: readonly EvidenceReference[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const reference of references) {
+    if (reference.type !== 'file-range' || reference.path === null) continue;
+    const text = formatPathRange(reference.path, reference.lineStart, reference.lineEnd);
+    if (seen.has(text)) continue;
+    seen.add(text);
+    result.push(text);
+  }
+  return result;
+}
+
+function filesFact(suspect: ScoredSuspect): VerdictFact {
+  const unique = uniqueFileRanges(suspect.evidenceReferences);
+  if (unique.length === 0) {
+    return { key: 'files', label: 'Files and lines', value: NO_RANGES_TEXT, values: [], moreCount: 0 };
+  }
+  const shown = unique.slice(0, 2);
+  return {
+    key: 'files',
+    label: 'Files and lines',
+    value: shown.join(', '),
+    values: shown,
+    moreCount: unique.length - shown.length,
+    mono: true,
+  };
+}
 
 export function buildVerdictView(stream: AnalysisStream): VerdictView | null {
   const kind = deriveResultKind(stream);
@@ -44,6 +112,8 @@ export function buildVerdictView(stream: AnalysisStream): VerdictView | null {
   if (leading === undefined) return null;
   const { band, labels } = stream.ranking.confidence;
   const filled = FILLED[band];
+  const chips = CONFIDENCE_LABEL_ORDER.filter((label) => labels.includes(label)).map((label) => LABEL_CHIP[label]);
+  const caution = band === 'low' || chips.length > 0 ? { lead: CAUTION_LEAD, chips } : null;
   return {
     heading: 'Most likely suspect',
     confidence: {
@@ -51,13 +121,27 @@ export function buildVerdictView(stream: AnalysisStream): VerdictView | null {
       filled,
       text: `Ranking confidence: ${BAND_WORD[band]}`,
       ariaLabel: `Ranking confidence: ${band}, ${filled} of 3`,
+      hasLabels: labels.length > 0,
     },
+    caution,
     headline: {
       mode: labels.includes('no-clear-culprit') ? 'no-clear-culprit' : 'suspect',
       shortSha: leading.shortSha,
       subject: leading.subject,
     },
     interpretation: toAnalysisResult(stream).incident.interpretation,
+    facts: [
+      { key: 'author', label: 'Author', value: leading.author },
+      { key: 'committed', label: 'Committed', value: formatUtcDateTime(leading.committedAtUtc) },
+      { key: 'gap', label: 'Time gap', value: formatTimeGap(leading.timeGapMinutes) },
+      { key: 'onset', label: 'Onset', value: stream.onset.explanation },
+      filesFact(leading),
+      { key: 'matches', label: 'Matching errors', value: matchesText(leading) },
+    ],
+    traceChip: traceMatchLabel(leading.traceSummary.matchKind),
+    score: { value: leading.score, text: formatScore(leading.score, 2), fraction: clamp01(leading.score) },
+    scoreHelper: SCORE_HELPER,
+    evidencePreview: leading.evidenceReferences.slice(0, 3).map((reference) => reference.detail),
     caveat: STANDING_CAVEAT,
   };
 }
@@ -115,7 +199,7 @@ export function buildStatePanel(stream: AnalysisStream): StatePanel | null {
 
 function warningChip(stream: AnalysisStream): string | null {
   const count = stream.warnings.length;
-  if (count > 0) return count === 1 ? '1 warning' : `${count} warnings`;
+  if (count > 0) return plural(count, 'warning');
   return stream.limits.truncated ? 'Input truncated' : null;
 }
 
