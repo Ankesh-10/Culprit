@@ -7,7 +7,13 @@ import { registerLocalFonts } from './fonts';
 import { initialPageState, reducePage, scheduleLoadingBanner } from './state';
 import type { PageEvent, PageState, Scheduler, SettledState } from './state';
 import { renderEmptyState, renderErrorState, renderLoadingPlaceholder, renderStatePanel, renderStatus } from './status';
+import { buildLogPanelView, initialInvestigation, investigationContext, reduceInvestigation } from './investigation-model';
+import type { InvestigationEvent, InvestigationState } from './investigation-model';
+import { renderLogLines } from './log-lines';
+import type { LogLinesPanel } from './log-lines';
 import { renderConsidered, renderShortlist } from './shortlist';
+import { SLIDER_FOCUS_ID, renderTimeline } from './timeline';
+import type { TimelineView } from './timeline';
 import { renderVerdict } from './verdict';
 import {
   buildConsideredRows,
@@ -18,6 +24,7 @@ import {
   deriveResultKind,
 } from './view-model';
 import { handleAnalyzeRequest } from '../worker/protocol';
+import type { AnalysisStream } from '../core/model';
 
 function required<T extends HTMLElement>(doc: Document, id: string): T {
   const node = doc.getElementById(id);
@@ -29,24 +36,6 @@ const timerScheduler: Scheduler = (callback, delayMs) => {
   const handle = setTimeout(callback, delayMs);
   return () => clearTimeout(handle);
 };
-
-function renderSettled(settled: SettledState): HTMLElement {
-  if (settled.phase === 'error') return renderErrorState(settled.failure);
-  const stream = settled.stream;
-  const panel = buildStatePanel(stream);
-  if (panel !== null) {
-    const parts: HTMLElement[] = [renderStatePanel(panel)];
-    if (deriveResultKind(stream) === 'no-eligible-commits') parts.push(renderConsidered(buildConsideredRows(stream)));
-    return el('div', { className: 'result-stack' }, parts);
-  }
-  const view = buildVerdictView(stream);
-  if (view === null) return el('p', { text: stream.ranking.interpretation });
-  const parts: HTMLElement[] = [renderVerdict(view)];
-  const shortlist = buildShortlistView(stream);
-  if (shortlist !== null) parts.push(renderShortlist(shortlist));
-  parts.push(renderConsidered(buildConsideredRows(stream)));
-  return el('div', { className: 'result-stack' }, parts);
-}
 
 export function mountApp(doc: Document): void {
   const picker = required<HTMLElement>(doc, 'case-picker');
@@ -63,6 +52,92 @@ export function mountApp(doc: Document): void {
   let cancelBanner: () => void = () => undefined;
   let loadedId: string | null = null;
   let hasResult = false;
+
+  let investigation: InvestigationState | null = null;
+  let activeStream: AnalysisStream | null = null;
+  let timelineView: TimelineView | null = null;
+  let logSlot: HTMLElement | null = null;
+  let logPanel: LogLinesPanel | null = null;
+  let logOpenerId: string | null = null;
+
+  function disposeInvestigation(): void {
+    timelineView?.dispose();
+    timelineView = null;
+    logSlot = null;
+    logPanel = null;
+  }
+
+  function renderLogPanel(): void {
+    if (logSlot === null || activeStream === null || investigation === null) return;
+    clear(logSlot);
+    logPanel = null;
+    if (!investigation.logPanel.open) return;
+    logPanel = renderLogLines(buildLogPanelView(activeStream, investigation), {
+      onClose: () => dispatchInvestigation({ type: 'close-log-lines' }, null),
+      onShowMore: () => dispatchInvestigation({ type: 'show-more-log-lines' }, null),
+    });
+    logSlot.append(logPanel.element);
+  }
+
+  function dispatchInvestigation(event: InvestigationEvent, openerId: string | null): void {
+    if (investigation === null || activeStream === null || timelineView === null) return;
+    const previous = investigation;
+    const next = reduceInvestigation(previous, event, investigationContext(activeStream));
+    if (next === previous) {
+      if (event.type === 'open-log-lines') logPanel?.heading.focus();
+      return;
+    }
+    investigation = next;
+    timelineView.update(next);
+    if (next.logPanel.open) {
+      renderLogPanel();
+      if (!previous.logPanel.open) {
+        logOpenerId = openerId;
+        logPanel?.heading.focus();
+      } else if (event.type === 'show-more-log-lines') {
+        (logPanel?.showMoreButton ?? logPanel?.heading)?.focus();
+      }
+    } else if (previous.logPanel.open) {
+      renderLogPanel();
+      const opener = logOpenerId ?? SLIDER_FOCUS_ID;
+      if (!timelineView.focusById(opener)) timelineView.focusById(SLIDER_FOCUS_ID);
+      logOpenerId = null;
+    }
+  }
+
+  /** The timeline and its log panel slot; selection state is reset whenever a different result arrives. */
+  function mountInvestigation(stream: AnalysisStream): HTMLElement {
+    disposeInvestigation();
+    if (activeStream !== stream || investigation === null) {
+      activeStream = stream;
+      investigation = initialInvestigation(stream);
+      logOpenerId = null;
+    }
+    timelineView = renderTimeline(stream, investigation, { onEvent: dispatchInvestigation });
+    logSlot = el('div', { className: 'log-slot' });
+    renderLogPanel();
+    return el('div', { className: 'investigation' }, [timelineView.element, logSlot]);
+  }
+
+  function renderSettled(settled: SettledState): HTMLElement {
+    if (settled.phase === 'error') return renderErrorState(settled.failure);
+    const stream = settled.stream;
+    const panel = buildStatePanel(stream);
+    if (panel !== null) {
+      const parts: HTMLElement[] = [renderStatePanel(panel)];
+      if (deriveResultKind(stream) === 'no-eligible-commits') parts.push(renderConsidered(buildConsideredRows(stream)));
+      parts.push(mountInvestigation(stream));
+      return el('div', { className: 'result-stack' }, parts);
+    }
+    const view = buildVerdictView(stream);
+    if (view === null) return el('p', { text: stream.ranking.interpretation });
+    const parts: HTMLElement[] = [renderVerdict(view)];
+    const shortlist = buildShortlistView(stream);
+    if (shortlist !== null) parts.push(renderShortlist(shortlist));
+    parts.push(renderConsidered(buildConsideredRows(stream)));
+    parts.push(mountInvestigation(stream));
+    return el('div', { className: 'result-stack' }, parts);
+  }
 
   function renderPicker(): void {
     renderCasePicker(picker, { cases: BUNDLED_CASES, loadedId, hasResult, sparklines, onLoad: loadById });
@@ -106,6 +181,7 @@ export function mountApp(doc: Document): void {
 
     switch (state.phase) {
       case 'idle':
+        disposeInvestigation();
         title.hidden = true;
         showBody(renderEmptyState());
         break;
@@ -124,6 +200,7 @@ export function mountApp(doc: Document): void {
         break;
       }
       case 'error': {
+        disposeInvestigation();
         title.hidden = true;
         const content = renderErrorState(state.failure);
         showBody(content);
