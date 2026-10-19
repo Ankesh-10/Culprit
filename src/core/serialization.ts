@@ -71,6 +71,9 @@ function canonicalErrorGroup(group: ErrorGroup): ErrorGroup {
     lastSeenUtc: utcTimestamp(group.lastSeenUtc, 'lastSeenUtc'),
     eventIds: [...group.eventIds].sort(),
     stackFrames: group.stackFrames.map(canonicalFrame),
+    ...(group.rawMessages === undefined ? {} : { rawMessages: [...group.rawMessages].sort(compareText) }),
+    ...(group.warnings === undefined ? {} : { warnings: [...group.warnings].sort(compareText) }),
+    ...(group.diagnostics === undefined ? {} : { diagnostics: [...group.diagnostics].sort(compareText) }),
   };
 }
 

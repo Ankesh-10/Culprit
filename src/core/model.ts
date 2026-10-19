@@ -155,9 +155,9 @@ export type OnsetClassification = Extract<OnsetClass, 'spike' | 'ramp' | 'none' 
 
 export interface OnsetAnalysis {
   /** The classifier name used by new callers. */
-  classification: OnsetClassification;
+  classification: OnsetClass;
   /** Wire-compatible spelling used by OnsetSummary and the Phase 1 result. */
-  class: OnsetClassification;
+  class: OnsetClass;
   buckets: UtcBucket[];
   baselineRate: number;
   peakRate: number;
@@ -238,7 +238,29 @@ export interface AnalysisResult {
 }
 
 export interface AnalysisInput {
-  logs: { text: string; format: LogFormat };
-  history: { text: string; format: HistoryFormat };
+  logs: { text: string; format: LogFormat; source?: string };
+  history: { text: string; format: HistoryFormat; source?: string };
   options: { bucketMinutes: number; maxLogBytes: number } | null;
 }
+
+/** The complete serializable Phase 2 analysis stream before result projection. */
+export interface AnalysisStream {
+  schemaVersion: SchemaVersion;
+  analysisVersion: AnalysisVersion;
+  scoringVersion: ScoringVersion;
+  provenance: Provenance;
+  limits: AnalysisLimits;
+  normalizedEvents: LogEvent[];
+  commits: GitCommit[];
+  errors: ErrorGroup[];
+  buckets: UtcBucket[];
+  timeline: TimelinePoint[];
+  onset: OnsetAnalysis;
+  warnings: string[];
+  assumptions: string[];
+  diagnostics: Diagnostic[];
+}
+
+export type AnalysisOutcome =
+  | { ok: true; stream: AnalysisStream }
+  | { ok: false; error: Error; diagnostics: import('./input-errors').InputDiagnostic[] };
