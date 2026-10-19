@@ -10,6 +10,7 @@ import {
   buildSeries,
   buildSignatureRows,
   buildTableTwinRows,
+  countForSignature,
   defaultBucketIndex,
   initialInvestigation,
   investigationContext,
@@ -303,5 +304,166 @@ describe('signature filter', () => {
     expect(state.filter).toBe(CAMERAS);
     expect(state.logPanel).toEqual({ open: true, visible: LOG_PAGE_SIZE, scope: 'signature' });
     expect(selectLogLines(AMBIGUOUS, state)).toHaveLength(2);
+  });
+});
+
+describe('signature table edge cases', () => {
+  it('yields one empty-state message and no rows for a log without error groups', () => {
+    const quiet: AnalysisStream = { ...AMBIGUOUS, errors: [] };
+    expect(buildSignatureRows(quiet, initialInvestigation(quiet))).toEqual({ rows: [], emptyText: 'No errors in this log' });
+  });
+
+  it('names the full date only when first seen is on a different day than the onset window start', () => {
+    const sameDay = buildSignatureRows(AMBIGUOUS, initialInvestigation(AMBIGUOUS)).rows;
+    expect(sameDay[0]?.accessibleName).toBe(`${CAMERAS}, 2 events, first seen 10:06:00 UTC`);
+    expect(sameDay.every((row) => !row.accessibleName.includes('2026-'))).toBe(true);
+
+    const shifted: AnalysisStream = {
+      ...AMBIGUOUS,
+      errors: AMBIGUOUS.errors.map((group) =>
+        group.signature === TABLETS ? { ...group, firstSeenUtc: '2026-10-20T10:24:00.000Z' } : group,
+      ),
+    };
+    const rows = buildSignatureRows(shifted, initialInvestigation(shifted)).rows;
+    const tablets = rows.find((row) => row.signature === TABLETS);
+    expect(tablets?.accessibleName).toBe(`${TABLETS}, 1 event, first seen 2026-10-20 10:24:00 UTC`);
+    expect(tablets?.firstSeen).toBe('10:24:00');
+    expect(tablets?.firstSeenTitle).toBe('2026-10-20 10:24:00 UTC');
+    expect(rows.find((row) => row.signature === CAMERAS)?.accessibleName).not.toContain('2026-');
+  });
+
+  it('compares against the first interval date when there is no onset window', () => {
+    const noOnset: AnalysisStream = {
+      ...AMBIGUOUS,
+      onset: { ...AMBIGUOUS.onset, windowStartUtc: null, windowEndUtc: null },
+      errors: AMBIGUOUS.errors.map((group) =>
+        group.signature === NOTEBOOKS ? { ...group, firstSeenUtc: '2026-10-18T23:59:00.000Z' } : group,
+      ),
+    };
+    const rows = buildSignatureRows(noOnset, initialInvestigation(noOnset)).rows;
+    expect(rows.find((row) => row.signature === NOTEBOOKS)?.accessibleName).toContain('2026-10-18 23:59:00 UTC');
+    expect(rows.find((row) => row.signature === CAMERAS)?.accessibleName).not.toContain('2026-');
+  });
+
+  it('breaks ties on first seen and then on signature text', () => {
+    const tied: AnalysisStream = {
+      ...AMBIGUOUS,
+      errors: AMBIGUOUS.errors.map((group) => ({ ...group, count: 1, firstSeenUtc: '2026-10-19T10:00:00.000Z' })),
+    };
+    const order = buildSignatureRows(tied, initialInvestigation(tied)).rows.map((row) => row.signature);
+    expect(order).toEqual([CAMERAS, NOTEBOOKS, TABLETS]);
+  });
+});
+
+describe('filtered data table', () => {
+  it('shows filtered error counts and keeps the signature counts', () => {
+    const plain = buildTableTwinRows(AMBIGUOUS, initialInvestigation(AMBIGUOUS));
+    const view = buildTableTwinRows(AMBIGUOUS, filtered(AMBIGUOUS, CAMERAS, 1));
+    expect(view.rows.map((row) => row.errors)).toEqual([0, 1, 0, 1, 0]);
+    expect(view.rows.map((row) => row.signatures)).toEqual(plain.rows.map((row) => row.signatures));
+    expect(view.rows).toHaveLength(plain.rows.length);
+  });
+
+  it('restores the totals when the filter is cleared', () => {
+    const cleared = buildTableTwinRows(AMBIGUOUS, filtered(AMBIGUOUS, null, 1));
+    expect(cleared.rows.map((row) => row.errors)).toEqual(AMBIGUOUS.timeline.map((point) => point.errorCount));
+  });
+});
+
+describe('filter scope transitions', () => {
+  const context = investigationContext(AMBIGUOUS);
+
+  it('closes a signature-scope panel when the filter is cleared', () => {
+    let state = reduceInvestigation(initialInvestigation(AMBIGUOUS), { type: 'set-filter', signature: CAMERAS }, context);
+    state = reduceInvestigation(state, { type: 'open-log-lines', scope: 'signature' }, context);
+    const cleared = reduceInvestigation(state, { type: 'set-filter', signature: null }, context);
+    expect(cleared.filter).toBeNull();
+    expect(cleared.logPanel).toEqual({ open: false, visible: LOG_PAGE_SIZE, scope: 'bucket' });
+  });
+
+  it('leaves a bucket-scope panel open when the filter is cleared', () => {
+    let state = reduceInvestigation(initialInvestigation(AMBIGUOUS), { type: 'set-filter', signature: CAMERAS }, context);
+    state = reduceInvestigation(state, { type: 'open-log-lines' }, context);
+    const cleared = reduceInvestigation(state, { type: 'set-filter', signature: null }, context);
+    expect(cleared.logPanel.open).toBe(true);
+    expect(cleared.logPanel.scope).toBe('bucket');
+    expect(selectLogLines(AMBIGUOUS, cleared)).toHaveLength(2);
+  });
+
+  it('keeps only one signature active and ignores a repeated filter', () => {
+    const first = reduceInvestigation(initialInvestigation(AMBIGUOUS), { type: 'set-filter', signature: CAMERAS }, context);
+    expect(reduceInvestigation(first, { type: 'set-filter', signature: CAMERAS }, context)).toBe(first);
+    const second = reduceInvestigation(first, { type: 'set-filter', signature: NOTEBOOKS }, context);
+    expect(second.filter).toBe(NOTEBOOKS);
+    const view = buildSignatureRows(AMBIGUOUS, second);
+    expect(view.rows.filter((row) => row.pressed).map((row) => row.signature)).toEqual([NOTEBOOKS]);
+  });
+
+  it('opens a bucket scope when a signature scope is requested without a filter', () => {
+    const state = reduceInvestigation(initialInvestigation(AMBIGUOUS), { type: 'open-log-lines', scope: 'signature' }, context);
+    expect(state.logPanel).toEqual({ open: true, visible: LOG_PAGE_SIZE, scope: 'bucket' });
+  });
+
+  it('returns a signature-scope panel to the selected interval when the selection moves', () => {
+    let state = reduceInvestigation(initialInvestigation(AMBIGUOUS), { type: 'set-filter', signature: CAMERAS }, context);
+    state = reduceInvestigation(state, { type: 'open-log-lines', scope: 'signature' }, context);
+    state = reduceInvestigation(state, { type: 'select', index: 3 }, context);
+    expect(state.logPanel.scope).toBe('bucket');
+    expect(state.logPanel.open).toBe(true);
+    expect(selectLogLines(AMBIGUOUS, state)).toHaveLength(1);
+  });
+
+  it('switches from a bucket-scope panel to the whole signature when asked', () => {
+    let state = reduceInvestigation(filtered(AMBIGUOUS, CAMERAS, 1), { type: 'open-log-lines' }, context);
+    expect(state.logPanel.scope).toBe('bucket');
+    state = reduceInvestigation(state, { type: 'open-log-lines', scope: 'signature' }, context);
+    expect(state.logPanel.scope).toBe('signature');
+    expect(reduceInvestigation(state, { type: 'open-log-lines', scope: 'signature' }, context)).toBe(state);
+  });
+});
+
+describe('log panel headings with a filter', () => {
+  it('appends the signature to the interval heading in bucket scope', () => {
+    const state = { ...filtered(AMBIGUOUS, CAMERAS, 1), logPanel: { open: true, visible: LOG_PAGE_SIZE, scope: 'bucket' as const } };
+    const view = buildLogPanelView(AMBIGUOUS, state);
+    expect(view.heading).toBe(`Log lines · 10:05–10:10 UTC · 1 event · ${CAMERAS}`);
+    expect(view.total).toBe(1);
+  });
+
+  it('names the signature and its full event count in signature scope', () => {
+    const state = { ...filtered(AMBIGUOUS, CAMERAS, 1), logPanel: { open: true, visible: LOG_PAGE_SIZE, scope: 'signature' as const } };
+    const view = buildLogPanelView(AMBIGUOUS, state);
+    expect(view.heading).toBe(`Log lines · ${CAMERAS} · 2 events`);
+    expect(view.total).toBe(2);
+    expect(view.rows).toHaveLength(2);
+    expect(view.emptyText).toBeNull();
+  });
+
+  it('shows the empty text for an interval without events of the signature', () => {
+    const view = buildLogPanelView(AMBIGUOUS, filtered(AMBIGUOUS, CAMERAS, 4));
+    expect(view.total).toBe(0);
+    expect(view.emptyText).toBe(LOG_EMPTY_TEXT);
+  });
+});
+
+describe('countForSignature', () => {
+  it('reads inherited object names as absent in every checkout interval', () => {
+    for (const bucket of CHECKOUT.buckets) {
+      for (const name of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+        expect(countForSignature(bucket, name)).toBe(0);
+      }
+    }
+  });
+
+  it('reads own signature counts', () => {
+    expect(CHECKOUT.buckets.map((bucket) => countForSignature(bucket, CHECKOUT_SIGNATURE))).toEqual([2, 0, 3]);
+    expect(countForSignature({ signatureCounts: { constructor: 4 } }, 'constructor')).toBe(4);
+  });
+
+  it('keeps an inherited-name filter from changing the series or the readout', () => {
+    expect(buildSeries(CHECKOUT, 'constructor').filtered).toEqual([0, 0, 0]);
+    expect(buildReadout(CHECKOUT, filtered(CHECKOUT, '__proto__', 2)).text).toBe(
+      '04:30–04:35 UTC · 0 of 3 errors · 1 signature · Inside onset window',
+    );
   });
 });
