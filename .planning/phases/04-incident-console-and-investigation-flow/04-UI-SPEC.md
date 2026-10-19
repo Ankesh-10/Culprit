@@ -1,7 +1,8 @@
 ---
 phase: "04"
 slug: incident-console-and-investigation-flow
-status: draft
+status: approved
+reviewed_at: "2026-10-19"
 shadcn_initialized: false
 preset: none
 created: "2026-10-19"
@@ -23,11 +24,21 @@ created: "2026-10-19"
 | Preset | not applicable |
 | Component library | none — plain DOM modules, semantic HTML, native CSS, hand-authored SVG |
 | Icon library | none — hand-authored 16px inline SVG `<symbol>` sprite in `index.html` (stroke 2px, `currentColor`, `aria-hidden="true"` unless the icon is the only content) |
-| Font | **Inter Variable** (UI) and **JetBrains Mono Variable** (hashes, paths, signatures, log lines), both SIL OFL, latin subset WOFF2, committed under `src/assets/fonts/` with an OFL note, declared via `@font-face` with `font-display: swap`. No CDN. Fallback stacks: `Inter, system-ui, -apple-system, "Segoe UI", sans-serif` and `"JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace` **(default)** |
+| Font | **Geist Variable** (UI) and **Geist Mono Variable** (hashes, paths, signatures, log lines, which are real code-like data), both SIL OFL 1.1, latin subset WOFF2, committed under `src/assets/fonts/` with an OFL note, declared via `@font-face` with `font-display: swap`. No CDN. Fallback stacks: `Geist, system-ui, -apple-system, "Segoe UI", sans-serif` and `"Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace` **(default; replaces the earlier Inter + JetBrains Mono pick, which is the generic dashboard pairing. Executor must confirm the Geist licence file ships with the WOFF2 before committing; if it cannot be obtained offline, fall back to the system stacks and note it.)** |
 | Data-viz method | `dataviz` skill applied (see "Data Visualization Contract" and "Palette Validation Record") |
 | Themes | Dark only in Phase 4. POLISH-01 (system-aware light/dark) is gated behind Phase 5 green checks. All colors below are CSS custom properties on `:root` so a light block can be added without touching component CSS. |
 
 Component Inventory: omitted by design (`Tool: none`; there is no installed design-system package to enumerate).
+
+### Identity and idea
+
+Direction: a quiet **case file**, not a generic dark dashboard. The idea comes from the subject: a commit is a suspect, the onset is the time of the incident, the shortlist is a lineup, and the diamond that marks a commit on the timeline is the product's one recurring motif.
+
+- **One motif, used consistently.** The 16px diamond (the timeline's commit mark) is also the wordmark glyph in the header (filled, ink), the rank marker on shortlist cards (`#1` filled aqua `#199e70`, `#2`/`#3` filled gray `#8fa0b8`, matching the chart exactly), and the check glyph on the loaded case card. No other decorative shape exists.
+- **The shortlist is a lineup.** Section heading "Suspect lineup" (sentence case, Body 600). Cards sit side by side at 1024px and up with equal height and the rank diamond leading each card. Copy remains evidence-first; the word "suspect" never implies guilt (see Copywriting voice rules).
+- **Case cards show real data, not icons.** Each case card carries a 28px-high error-rate sparkline of that fixture's buckets (2px line `#3987e5`, no axes, no fill), computed by running the pure `analyze()` core once per bundled case on idle after first paint (deterministic, local, no network). If it fails or is slow, the card renders without the sparkline; the sparkline is `aria-hidden` and its meaning is already in the chip text ("Sharp spike", "Slow ramp", "Ambiguous").
+- **No ornaments.** Cards are separated by tone steps (`#121e31` on `#0b1220`, drawer and tooltip `#1a2a42`), not outlines or shadows. No eyebrow labels, no uppercase tracked captions, no gradients, no glass, no icon-topped cards, no index numbering other than real rank. The only remaining lines are the ones that carry function: control and drop-zone borders (non-text contrast; the drop zone is 2px dashed), table row rules, and chart baseline/gridlines (a measured instrument). The accent (`#7dd3fc`) and the leading-suspect aqua (`#199e70`) never appear on the same element.
+- **Not in scope here.** Scroll-driven motion, GSAP and stock imagery do not apply: Culprit is an offline analysis tool with no network assets, and motion is gated to Phase 5 (POLISH-02).
 
 ### Recommended module boundaries (non-binding; planner may adjust)
 
@@ -75,8 +86,8 @@ Container: `max-width: 1152px`, horizontal padding 16px below 640px and 24px fro
 Exceptions (all explicit):
 
 - Touch and click targets are at least **44px** high and wide (a multiple of 4, deliberately above the 24px dataviz minimum): buttons, case cards, table action buttons, drawer close, the timeline slider thumb area, commit markers (hit area 44px on coarse pointers, 24px on fine pointers).
-- 1px hairlines (card borders, grid lines, axes, table rules) and 2px marks (series line, focus ring width, surface ring and gap around markers and segments) are stroke widths, not spacing.
-- SVG mark sizes are mark specs, not spacing: markers 8, 12 and 16px; plot heights listed in the timeline section.
+- 1px hairlines (control borders, grid lines, axes, table rules) and 2px strokes (series line, drop-zone border, drag-over border, focus ring width and its 2px offset, surface ring and gap around markers and segments) are stroke widths and focus geometry, not spacing.
+- SVG mark sizes are mark specs, not spacing: markers 8, 12 and 16px; sparkline height 28px; plot heights listed in the timeline section.
 - Drawer width 480px (a multiple of 4) on laptop; full viewport width on phone.
 
 ---
@@ -87,8 +98,8 @@ Exactly four sizes and two weights.
 
 | Role | Size | Weight | Line Height | Used for |
 |------|------|--------|-------------|----------|
-| Display | 32px | 600 | 1.1 | Leading-suspect short hash in the verdict card only (JetBrains Mono). Exactly one per view. Proportional figures, no `tabular-nums`. |
-| Heading | 24px | 600 | 1.2 | Wordmark "Culprit", verdict commit subject, state headings (empty, error, no-incident), drawer title |
+| Display | 48px at all widths (7 mono characters is about 202px, inside the 288px content width at 320px) | 600 | 1.1 | Leading-suspect short hash in the verdict card only (Geist Mono). Exactly one per view. Proportional figures, no `tabular-nums`. This is the page's one very large element; everything else steps down to 24px or less. |
+| Heading | 24px | 600 | 1.2 | Wordmark "Culprit", verdict commit subject, shortlist rank label ("#1"), state headings (empty, error, no-incident), drawer title, and the result `h2` ("Result: {case or file name}") |
 | Body | 16px | 400 | 1.5 | Prose, interpretation sentence, rationale, evidence details, textarea and input text (16px prevents iOS zoom), button text at weight 600 |
 | Label | 14px | 400 / 600 | 1.4 | Table cells and headers (600), chips, key-value labels (400) and values (600), axis tick labels, legend, tooltip, readout bar, log-line rows, helper text |
 
@@ -96,9 +107,9 @@ Weights: **400 regular** and **600 semibold** only. No 500, 700, or italics for 
 
 Rules:
 
-- Section headings (`h2`) in cards use **Label 14px / 600 uppercase with 0.08em letter-spacing** as an eyebrow, with the real heading semantics intact; the visual size does not change the heading level.
+- Section headings (`h2`) in cards use **Body 16px / 600, sentence case, no letter-spacing, no uppercase**, with the real heading semantics intact; the visual size does not change the heading level. There are no eyebrow labels anywhere.
 - `font-variant-numeric: tabular-nums` only in table number columns, axis ticks and the readout bar; never on Display or Heading.
-- Mono (`JetBrains Mono`) is used for short hashes, file paths, line ranges, signatures and log lines, at the same size and weight as the surrounding role. Long mono strings wrap with `overflow-wrap: anywhere`; never ellipsis-truncate a hash, path or signature without a full-text equivalent in the drawer or log panel.
+- Mono (`Geist Mono`) is used for short hashes, file paths, line ranges, signatures and log lines, at the same size and weight as the surrounding role. Long mono strings wrap with `overflow-wrap: anywhere`; never ellipsis-truncate a hash, path or signature without a full-text equivalent in the drawer or log panel.
 - Commit subjects and messages wrap (`overflow-wrap: anywhere`) up to 3 lines in cards (`line-clamp: 3` with the full text in the drawer) and unlimited in the drawer.
 - Replaces the current `clamp(3rem, 10vw, 6rem)` hero h1. The shipped hero treatment is removed in Phase 4.
 
@@ -123,18 +134,20 @@ Ink and chrome (these fall inside the 60/30 surfaces rather than adding a hue):
 | ink | `#e9eef5` | 14.34:1 | Primary text, values |
 | ink-2 | `#b7c3d4` | 9.37:1 | Secondary text, legend, prose helper text |
 | muted | `#8fa0b8` | 6.28:1 | Axis ticks, captions, non-leading commit markers |
-| border | `#2d405b` | decorative | Card and table borders |
+| border | `#2d405b` | decorative | Table row rules and the dialog backdrop edge only. Cards, tooltip and drawer have no outline: surfaces separate by tone step. |
 | control-border | `#66799a` | 3.80:1 (3.28:1 on raised) | Inputs, buttons, drop zone, chip outlines — meets the 3:1 non-text rule |
 | grid | `#22324a` | recessive | 1px solid gridlines (never dashed) |
 | axis | `#46587a` | recessive | 1px baseline and axis rule |
 
 Accent reserved for (explicit; never "all interactive elements"):
 
-1. The primary button fill ("Analyze incident") and nothing else filled.
+1. The primary button fill ("Analyze incident"); the only accent-filled control.
 2. The keyboard focus ring: 2px solid `#7dd3fc` with 2px offset on every focusable element (10.03:1 on secondary, 11.23:1 on page).
 3. The selected state of toggles that carry `aria-pressed="true"` or `aria-current` (active case in the switcher, active signature filter): 4px accent left rule plus the check icon — never accent alone.
-4. The fill of the score meter and the confidence meter segments (track is `#22324a`).
+4. Meter fills, all magnitude-only: the score meter, the confidence meter segments, and the signal contribution bars in the drawer (track is `#22324a`).
 5. The selected-bucket marker on the timeline (2px ring and the readout-bar left rule).
+
+No other element uses accent. Drag-over on a drop zone is ink (2px solid `#e9eef5` border plus the text change), not accent.
 
 Not accent: links (ink, underlined), the error series, the onset band, commit markers, status icons, headings, borders.
 
@@ -145,7 +158,7 @@ Data-viz colors (categorical slots 1-3 of the validated dataviz palette; dark st
 | Errors per bucket | `--viz-series-errors` | `#3987e5` (slot 1, blue) | 2px line plus 10% area wash |
 | Onset window | `--viz-onset` | `#d95926` (slot 2, orange) | 14% band wash plus 2px top bracket plus text label |
 | Leading suspect | `--viz-suspect` | `#199e70` (slot 3, aqua) | 16px filled diamond, 2px surface ring, text label |
-| Context (total when filtered, non-leading commits) | `--viz-context` | `#8fa0b8` (muted) | 2px line / 10px hollow diamond |
+| Context (total when filtered, non-leading commits) | `--viz-context` | `#8fa0b8` (muted) | 2px line / 8px hollow diamond |
 
 Color follows the entity, never its rank: ranks 2 and 3 are never given their own hue; they wear the context gray plus a rank number inside the marker.
 
@@ -196,7 +209,7 @@ No dual axis, no second y-scale, no pie, no per-signature rainbow. Selected-sign
 | Onset band | Rect `#d95926` at 14% opacity from window start to window end, full plot height; 2px solid `#d95926` bracket along its top edge; label "Onset window" in ink-2 Label 14px above the plot left-aligned to the band, shifted to stay inside the plot |
 | Leading suspect | 16px diamond filled `#199e70`, 2px surface ring (`#121e31`), a 1px vertical leader (`#8fa0b8`) from the marker to the baseline, label "#1 3a4b5c6" in ink Label 14px/600 |
 | Ranks 2-3 | 12px diamond filled `#8fa0b8`, 2px surface ring, rank digit not drawn inside (too small); label "#2" / "#3" only |
-| Other commits | 10px hollow diamond, 2px stroke `#8fa0b8`, no label; counted in the table twin and the "Commits considered" list |
+| Other commits | 8px hollow diamond, 2px stroke `#8fa0b8`, no label; counted in the table twin and the "Commits considered" list |
 | Selected bucket | 2px accent ring on the line point plus a 1px vertical crosshair in ink-2 across all lanes |
 | Surface rings | 2px in `#121e31` around every marker so overlaps stay legible |
 | Label collisions | Never nudge-stack labels. Priority: onset label, then "#1" label, then "#2"/"#3", then peak label. A lower-priority label that would overlap a higher one is dropped (its marker stays; the value stays in the readout bar and table twin). On phone, "#2" and "#3" labels are always dropped. |
@@ -205,7 +218,7 @@ No dual axis, no second y-scale, no pie, no per-signature rainbow. Selected-sign
 
 Tooltips enhance and never gate: every tooltip value is also in the always-visible readout bar and the table twin.
 
-- Crosshair snaps to the nearest bucket center. Fine pointer: hover moves the crosshair and shows a tooltip (`#1a2a42`, 1px `#2d405b`, 4px radius) listing `HH:MM–HH:MM UTC`, error count (value strong 600, label secondary), signature count, "Inside onset window" when true, and commit short hashes in the bucket. Coarse pointer: tap selects the bucket, no tooltip; the readout bar carries the same text.
+- Crosshair snaps to the nearest bucket center. Fine pointer: hover moves the crosshair and shows a tooltip (`#1a2a42`, no outline, 4px radius) listing `HH:MM–HH:MM UTC`, error count (value strong 600, label secondary), signature count, "Inside onset window" when true, and commit short hashes in the bucket. Coarse pointer: tap selects the bucket, no tooltip; the readout bar carries the same text.
 - Hit targets exceed marks: one transparent overlay rect picks the nearest bucket by x (no per-bucket DOM nodes, so 10,000 buckets are cheap); commit marker hit areas are 24px (fine) / 44px (coarse), including the 2px ring.
 - **Readout bar** (always visible, directly under the chart, not hover-dependent, `aria-live="polite"` with `aria-atomic="true"`): `04:30–04:35 UTC · 42 errors · 3 signatures · Inside onset window · Commits 3a4b5c6` plus the button "Show log lines (42)". Default selection on load is the **onset bucket** (or the peak bucket when there is no onset), so the bar is never empty.
 - Filters sit in one row above the chart inside the timeline card header: signature filter chip with "Clear filter" and the toolbar buttons "Jump to onset", "Jump to peak". The chart, readout bar, log panel and table twin all re-render against the same filter slice.
@@ -255,27 +268,27 @@ Single page, single column, reading order equals DOM order. Breakpoints: phone b
 | 10 | Trust footer | `<footer>` / `<details>` | Warnings and diagnostics, assumptions and caveats, provenance, limits, UTC note |
 | 11 | Suspect drawer | `<dialog>` opened with `showModal()` | See Suspect Drawer |
 
-Grid: regions 5-10 are full-width cards stacked with `lg` (24px) gaps. Shortlist `<ol>` is a 3-column grid at 1024px and up, 1 column below. Card radius 8px, 1px `#2d405b` border, no shadows, no gradients.
+Grid: regions 5-10 are full-width cards stacked with `lg` (24px) gaps. Shortlist `<ol>` is a 3-column grid at 1024px and up, 1 column below. Card radius 8px, no outline, no shadows, no gradients; the tone step from page `#0b1220` to card `#121e31` is the separator. The header sits flat on the page plane with no bar chrome.
 
 ### Input panel
 
-- Three **case cards** (`<button>`, 44px minimum, equal width at 640px and up, stacked on phone): case name (Heading 24px is too large — use Body 16px / 600), manifest purpose (Label 14px ink-2, up to 3 lines), a chip with the demonstrated pattern ("Sharp spike", "Slow ramp", "Ambiguous" from `manifest.expected.onsetClass`). One click loads and analyzes: UX-01. The loaded case shows the accent left rule and a check icon, with `aria-pressed="true"`.
+- Three **case cards** (`<button>`, 44px minimum, equal width at 640px and up, stacked on phone): case name (Heading 24px is too large — use Body 16px / 600), the 28px error-rate sparkline (see Identity and idea), manifest purpose (Label 14px ink-2, up to 3 lines), a chip with the demonstrated pattern ("Sharp spike", "Slow ramp", "Ambiguous" from `manifest.expected.onsetClass`). One click loads and analyzes: UX-01. The loaded case shows the accent left rule and a check icon, with `aria-pressed="true"`.
 - **Own files** form (collapsed behind "Use your own files" before first result; expanded by default only when the user opens it):
-  - Two fields, "Log" and "Git history". Each is a drop zone (`<label>` wrapping a visually hidden but focusable `<input type="file">`; accept `.jsonl,.log,.txt` and `.json`) with 2px dashed control-border, icon, text "Drop a file or choose one", and helper text "JSON-lines or plain text · up to 1 MiB · 10,000 events" / "Culprit JSON history export". During drag-over the border becomes solid accent and the text changes to "Release to load" (text change, not color alone).
+  - Two fields, "Log" and "Git history". Each is a drop zone (`<label>` wrapping a visually hidden but focusable `<input type="file">`; accept `.jsonl,.log,.txt` and `.json`) with 2px dashed control-border, icon, text "Drop a file or choose one", and helper text "JSON-lines or plain text · up to 1 MiB · 10,000 events" / "Culprit JSON history export". During drag-over the border becomes solid 2px ink (`#e9eef5`) and the text changes to "Release to load" (text change, not color alone).
   - Under each zone a disclosure "Or paste text" containing a `<textarea>` (mono, 16px, 8 rows laptop, 6 rows phone, `spellcheck="false"`, `autocomplete="off"`).
-  - After a file is chosen the zone shows `file-name · size` and a "Remove" button.
+  - After a file is chosen the zone shows `file-name · size` (wraps with `overflow-wrap: anywhere`, never truncated) and a "Remove file" button.
   - Log format `<select>`: "Auto-detect" (default), "JSON-lines", "Plain text". Auto-detect rule (deterministic): the first non-empty line starting with `{` is JSON-lines, otherwise plain text; the detected format is stated beside the select: "Detected: JSON-lines". History format is fixed to "Culprit JSON export" (`git-log` is not supported by the Phase 2 parser; the UI offers no choice).
   - Buttons: primary **Analyze incident** (accent fill, disabled until both fields have content; disabled reason in `aria-describedby`: "Add a log and a git history to analyze"), secondary **Clear inputs** (two-step inline confirmation, see Copywriting).
 - Drag-and-drop never replaces the keyboard path: the file input is reachable with Tab and activates with Enter or Space.
 
 ### Verdict card (UX-02)
 
-Evidence-first, readable in under ten seconds. Left column (2fr) and facts column (1fr) from 768px; single column below.
+Evidence-first, readable in under ten seconds. Left column (2fr) and facts column (1fr) from 1024px; single column below.
 
-1. Eyebrow row: "Verdict" (Label 600 uppercase) and the **confidence meter** at the right: 3 segments (high 3, medium 2, low 1 filled, accent fill on `#22324a` track, 2px gaps), the words "Ranking confidence: Medium", and an info icon only if labels exist. The meter is `role="img"` with `aria-label="Ranking confidence: medium, 2 of 3"`.
+1. Heading row: "Most likely suspect" (Body 600, sentence case; the `h2`) and the **confidence meter** at the right: 3 segments (high 3, medium 2, low 1 filled, accent fill on `#22324a` track, 2px gaps), the words "Ranking confidence: Medium", and an info icon only if labels exist. The meter is `role="img"` with `aria-label="Ranking confidence: medium, 2 of 3"`.
 2. **Caution banner** (only when `confidence.band === 'low'` or `confidence.labels.length > 0`): 4px warning stripe, alert-triangle icon, bold lead sentence, then one chip per `ConfidenceLabel` in fixed `CONFIDENCE_LABEL_ORDER` with text: "Low confidence", "Ambiguous", "Weak evidence", "No clear culprit".
 3. Interpretation: `incident.interpretation` verbatim, Body 16px, max measure 70ch.
-4. Headline: the short hash in Display 32px mono, then the commit subject in Heading 24px, wrapped. When the labels include "No clear culprit", the headline becomes the Heading text "No clear culprit" and the hash/subject move into a "Leading candidate" sub-block at Body size.
+4. Headline: the short hash in Display 48px mono, then the commit subject in Heading 24px, wrapped. When the labels include "No clear culprit", the headline becomes the Heading text "No clear culprit" and the hash/subject move into a "Leading candidate" sub-block at Body size.
 5. Facts (key-value grid, Label 14px; label 400 ink-2, value 600 ink): Author · Committed (`2026-10-19 04:18 UTC`) · Time gap (`12 min before onset window start`) · Files and lines (first 2 `file-range` references as `path:start–end`, then "+N more") · Matching errors ("Matches 38 of 42 errors" from `traceSummary`) · Trace match kind chip (`exact-line` -> "Exact line", `nearby-line` -> "Nearby line", `file-only` -> "File only", `none` -> "No trace match") · Score (score meter plus `0.74`, helper "Suspicion score from 0 to 1 — ranked suspicion, not probability").
 6. Evidence preview: up to three bullet lines from `evidenceReferences[].detail` (plain text), then "See all evidence" which opens the drawer.
 7. Actions row: **Inspect evidence** (secondary button, opens the drawer for #1) and **Copy Markdown postmortem** (secondary button with copy icon), plus the copy-feedback line (see Copy flow).
@@ -283,11 +296,11 @@ Evidence-first, readable in under ten seconds. Left column (2fr) and facts colum
 
 ### Shortlist (RANK-03 surface)
 
-`<ol>` of up to three suspect cards: rank "#1" (Heading 24px), short hash (mono 600), subject (3-line clamp), author and committed time, "12 min before onset", mini score meter with value, trace-match chip, "Matches 38 of 42 errors", and button **Inspect evidence** (opens drawer). The #1 card carries the "Leading" tag (text, plus the card is first) — it is not recolored. Fewer than three suspects render only the rows that exist; zero suspects render the no-eligible-commits panel instead of the list. Below the list, `<details>` **Commits considered (N)** with a table from `ranking.considered`: Rank (or "—"), Short hash, Subject, Status text ("Top three", "Scored", "Excluded"), Score, Reason (`reason` verbatim for excluded rows). This makes exclusions explicit.
+Headed "Suspect lineup" (`h2`, Body 600). `<ol>` of up to three suspect cards: rank diamond (same mark as the chart) plus "#1" (Heading 24px), short hash (mono 600), subject (3-line clamp), author and committed time, "12 min before onset", mini score meter with value, trace-match chip, "Matches 38 of 42 errors", and button **Inspect evidence** (opens drawer). The #1 card carries the "Leading" tag (text, plus the card is first) — it is not recolored. Fewer than three suspects render only the rows that exist; zero suspects render the no-eligible-commits panel instead of the list. Below the list, `<details>` **Commits considered (N)** with a table from `ranking.considered`: Rank (or "—"), Short hash, Subject, Status text ("Top three", "Scored", "Excluded"), Score, Reason (`reason` verbatim for excluded rows). This makes exclusions explicit.
 
 ### Timeline card (UX-03, UX-04)
 
-Header row: eyebrow "Timeline", chart title "Errors per 5-minute interval (UTC)", filter chip (when a signature is active: `Filtered: {signature}` plus "Clear filter" button), buttons "Jump to onset" and "Jump to peak". Then the legend row, the SVG, the readout bar, and the table twin `<details>`.
+Header row: heading "Timeline" (Body 600), chart title "Errors per 5-minute interval (UTC)", filter chip (when a signature is active: `Filtered: {signature}` plus "Clear filter" button), buttons "Jump to onset" and "Jump to peak". Then the legend row, the SVG, the readout bar, and the table twin `<details>`.
 
 - Domain: from `min(first bucket start, earliest eligible commit)` to `max(last bucket end, latest eligible commit)`. If the extended domain would exceed 6 times the log span, clip it to `[first bucket start − log span, last bucket end]` and show the note "N earlier commits are outside this view; see Commits considered." The error line only spans the bucket range; the onset band and commit lane share the same scale.
 - Bucket width label comes from the data (`bucketEndUtc − bucketStartUtc`), not hard-coded "5".
@@ -296,7 +309,7 @@ Header row: eyebrow "Timeline", chart title "Errors per 5-minute interval (UTC)"
 
 ### Log lines panel (UX-04)
 
-Header: `Log lines · 04:30–04:35 UTC · 42 events` (and `· {signature}` when filtered) plus "Close" button (returns focus to the control that opened it). Rows are a plain table: Line (`source.line`, mono, tabular), Time (UTC `HH:MM:SS`), Level (text chip, never color alone), Message (mono, wraps), and a "Stack" `<details>` showing `stack` verbatim in a `<pre>` (`white-space: pre-wrap; overflow-wrap: anywhere`) when present. Level chip text: "ERROR", "WARN", "INFO"... Events are those whose `eventId` is in the selected bucket's `eventIds`, intersected with the signature's `eventIds` when filtered, ordered by timestamp then `eventId`. Render at most 100 rows; button "Show next 100" appends; the count line always shows the true total. No hover is required to read any cell.
+Header: `Log lines · 04:30–04:35 UTC · 42 events` (and `· {signature}` when filtered) plus "Close log lines" button (returns focus to the control that opened it). Rows are a plain table: Line (`source.line`, mono, tabular), Time (UTC `HH:MM:SS`), Level (text chip, never color alone), Message (mono, wraps), and a "Stack" `<details>` showing `stack` verbatim in a `<pre>` (`white-space: pre-wrap; overflow-wrap: anywhere`) when present. Level chip text: "ERROR", "WARN", "INFO"... Events are those whose `eventId` is in the selected bucket's `eventIds`, intersected with the signature's `eventIds` when filtered, ordered by timestamp then `eventId`. Render at most 100 rows; button "Show next 100" appends; the count line always shows the true total. No hover is required to read any cell.
 
 ### Error signatures table (UX-06)
 
@@ -307,10 +320,10 @@ Columns: Signature (mono, wraps), Events (right-aligned, tabular), First seen (U
 A native `<dialog>` opened with `showModal()` (focus trap, Escape to close, background inert, backdrop `rgba(5,10,18,0.64)`). Laptop: anchored right, 480px wide, full height, scrolls internally. Below 640px: full viewport (100vw by 100dvh). No slide animation in Phase 4.
 
 - Focus: on open, focus moves to the drawer title (`tabindex="-1"`); on close, focus returns to the control that opened it (stored reference; re-resolved by suspect rank if the DOM was re-rendered).
-- Header: title `#1 3a4b5c6`, subtitle commit subject, buttons "Previous suspect" / "Next suspect" (disabled at the ends, with text labels at 640px and up and icon-only with `aria-label` below), and "Close" (44px).
+- Header: title `#1 3a4b5c6`, subtitle commit subject, buttons "Previous suspect" / "Next suspect" (disabled at the ends, with text labels at 640px and up and icon-only with `aria-label` below), and "Close suspect drawer" (44px; icon-only below 640px with the same `aria-label`).
 - Sections, each an `h3`:
   1. **Summary**: author, committed (UTC), time gap, trace match chip, total score with meter, and the full SHA (`user-select: all`).
-  2. **Why it ranks here**: exactly one row per `SignalContribution`, in the fixed order proximity, trace-match, novelty, churn. Row: plain title, `value 0.920 × weight 0.350 = 0.322`, a contribution bar (single accent hue, length = contribution / weight, track `#22324a`, nominal categories so one color), and the signal's `explanation` as the one sentence of prose. Closing row: "Total suspicion score 0.742 (sum of the contributions above), rounded for display."
+  2. **Why it ranks here**: exactly one row per `SignalContribution`, in the fixed order proximity, trace-match, novelty, churn. Row: plain title, `value 0.920 × weight 0.350 = 0.322`, a contribution bar (accent meter fill, reserved item 4; length = contribution / weight, track `#22324a`, nominal categories so one color), and the signal's `explanation` as the one sentence of prose. Closing row: "Total suspicion score 0.742 (sum of the contributions above), rounded for display."
   3. **Changed files and line ranges**: from `stream.commits` by `sha`: per file, path (mono), `+added −deleted`, and ranges as `L104–126`. A range that overlaps a `file-range` evidence reference for a stack frame gets the chip "Overlaps stack frame at line 118". Footnote: "Culprit's history export lists changed line ranges, not diff text. Open the commit in your repository to read the diff."
   4. **Evidence**: all `evidenceReferences`, each with a type label (Log event, Error group, File range, Feature), `path:lineStart–lineEnd` when present, and `detail`. Items of type error-group or log-event have a button "Show matching log lines" that closes the drawer, applies the signature filter, and moves focus to the log panel heading.
   5. **Caveat**: "This score ranks suspicion from timing, stack, novelty and change size. It is not proof that this commit caused the incident."
@@ -320,7 +333,7 @@ A native `<dialog>` opened with `showModal()` (focus trap, Escape to close, back
 
 - Source: `serializeMarkdown(toAnalysisResult(stream))`, computed on demand; identical output for identical input.
 - Primary path: `navigator.clipboard.writeText` (secure context or localhost). On success: inline `role="status"` text with check icon (good) "Markdown postmortem copied (N lines)." It stays until the next result change, drawer interaction, or another copy (no auto-dismiss timer).
-- Fallback (API missing, rejects, or `file://`): reveal a read-only `<textarea>` below the button (mono, 8 rows, full width) containing the Markdown, select its contents with `focus()` and `select()`, and show the warning-icon message "Couldn't copy automatically. The Markdown is selected below. Press Ctrl+C (Cmd+C on Mac)." A "Hide" button collapses it. The fallback also appears whenever `document.execCommand('copy')` is the only remaining option: it is never used silently.
+- Fallback (API missing, rejects, or `file://`): reveal a read-only `<textarea>` below the button (mono, 8 rows, full width) containing the Markdown, select its contents with `focus()` and `select()`, and show the warning-icon message "Couldn't copy automatically. The Markdown is selected below. Press Ctrl+C (Cmd+C on Mac)." A "Hide Markdown" button collapses it. The fallback also appears whenever `document.execCommand('copy')` is the only remaining option: it is never used silently.
 - The button keeps the label "Copy Markdown postmortem" throughout; the status line carries the outcome (so assistive tech does not lose its focus target).
 
 ### Trust footer
@@ -383,7 +396,7 @@ Every focusable element shows a 2px accent outline with 2px offset (`:focus-visi
 | 1024px and up | Container 1152px; shortlist in 3 columns; verdict two columns; drawer 480px right-anchored; timeline plot 160px; up to 6 x ticks |
 | 640-1023px | Single column; shortlist stacked or 2 columns if cards stay at least 280px; drawer 480px; plot 160px; 4 ticks |
 | Below 640px | Single column, 16px gutters; case cards stacked; verdict facts as a one-column key-value list; shortlist stacked; tables in horizontally scrollable regions with sticky first column; drawer full-screen; plot 128px; 3 ticks; "#2"/"#3" labels dropped; buttons full width in the actions row |
-| 320px | No horizontal page scroll; Display hash still on one line (7 mono characters at 32px ≈ 135px); chips wrap |
+| 320px | No horizontal page scroll; Display hash still on one line (7 mono characters at 48px ≈ 202px); chips wrap |
 
 The core path (load case, read verdict, open drawer, copy Markdown) must work without horizontal page scrolling at 320px.
 
@@ -432,7 +445,9 @@ Voice: calm, precise, evidence-first. Use "suspect", "lead", "worth checking fir
 | Signature filter chip | Filtered: {signature} · Clear filter |
 | Destructive confirmation | Clear inputs: Remove the loaded log and git history from this page? The current result stays until you load something new. Buttons: "Clear inputs" (critical fill) and "Keep inputs". |
 
-Heading and label case: sentence case throughout; eyebrows are uppercase via CSS only (`text-transform`), not typed in uppercase.
+Heading and label case: sentence case throughout, typed and rendered as written. No uppercase transforms, no tracked small-caps labels, no eyebrows.
+
+Region headings: "Load an incident", "Most likely suspect", "Suspect lineup", "Timeline", "Log lines", "Error signatures", "Warnings and caveats".
 
 Destructive actions in this phase: only "Clear inputs" (discards pasted or loaded text). Approval is an inline two-step confirmation (the button swaps to the confirm row; no timeout; Escape cancels; focus lands on "Keep inputs"). No other destructive action exists; copy is non-destructive.
 
@@ -440,7 +455,7 @@ Destructive actions in this phase: only "Clear inputs" (discards pasted or loade
 
 ## UI Considerations
 
-Applicable state considerations resolved: 14 covered, 2 backstop, 2 unresolved.
+Applicable state considerations resolved: 17 covered, 2 backstop, 0 unresolved. Added: sparkline failure state.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
@@ -460,8 +475,9 @@ Applicable state considerations resolved: 14 covered, 2 backstop, 2 unresolved.
 | zero-one-many | list-collection (shortlist) | ✅ covered | Singular/plural helper in `format.ts` ("1 suspect", "2 suspects", "1 event"); rows render only for suspects that exist |
 | long-text | static-content (commit subject, signature, message) | ✅ covered | Cards clamp subjects to 3 lines, drawer shows the full text, mono strings use `overflow-wrap: anywhere` |
 | long-text | static-content (file paths, stack traces) | 🧪 backstop | Paths wrap in mono; stacks scroll inside `<pre>` with `pre-wrap`; verify at 320px with a 200-character path |
-| overflow | nav (case switcher at 320px) | ⚠ unresolved | Three toggle buttons plus "Use your own files" may need to wrap to two rows; planner assumes wrapping at 640px and below, row height grows |
-| long-text | interactive-control (uploaded file name) | ⚠ unresolved | Planner assumption: show the name with `overflow-wrap: anywhere` and no truncation |
+| overflow | nav (case switcher at 320px) | ✅ covered | Below 640px the switcher is `flex-wrap`: three toggles then "Use your own files", each at least 44px high, rows grow; the 48px row height applies from 640px up |
+| long-text | interactive-control (uploaded file name) | ✅ covered | File name wraps with `overflow-wrap: anywhere`, never truncated |
+| error | static-content (case card sparkline) | ✅ covered | If the idle analysis fails or throws, the card renders without the sparkline and nothing else changes; the sparkline never blocks case loading |
 
 ---
 
@@ -493,12 +509,12 @@ Manual/Phase 5 verification (outside Vitest): render at 1280x720 and 360x740, ke
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
-- [ ] Dimension 7 Inventory Provenance: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
+- [x] Dimension 7 Inventory Provenance: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-19 (checker APPROVED; researcher defaults accepted by user delegation, see report)
