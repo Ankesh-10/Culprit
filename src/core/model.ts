@@ -127,6 +127,46 @@ export interface ErrorGroup {
   lastSeenUtc: TimestampUtc;
   eventIds: string[];
   stackFrames: StackFrame[];
+  /** Raw message variants are retained as audit evidence; the signature is normalized. */
+  rawMessages?: string[];
+  /** Group-local warnings explain missing or ambiguous stack ownership. */
+  warnings?: string[];
+  diagnostics?: string[];
+}
+
+export interface SignatureCount {
+  signature: string;
+  count: number;
+}
+
+/** A fixed-width, half-open UTC interval in the deterministic error series. */
+export interface UtcBucket {
+  bucketStartUtc: TimestampUtc;
+  bucketEndUtc: TimestampUtc;
+  errorCount: number;
+  signatureCounts: Record<string, number>;
+  eventIds: string[];
+  errorGroupSignatures: string[];
+  /** Reserved for Phase 3 history correlation. */
+  commitShas: string[];
+}
+
+export type OnsetClassification = Extract<OnsetClass, 'spike' | 'ramp' | 'none' | 'insufficient-data'>;
+
+export interface OnsetAnalysis {
+  /** The classifier name used by new callers. */
+  classification: OnsetClassification;
+  /** Wire-compatible spelling used by OnsetSummary and the Phase 1 result. */
+  class: OnsetClassification;
+  buckets: UtcBucket[];
+  baselineRate: number;
+  peakRate: number;
+  onsetBucket: UtcBucket | null;
+  onsetWindow: { startUtc: TimestampUtc; endUtc: TimestampUtc } | null;
+  windowStartUtc: TimestampUtc | null;
+  windowEndUtc: TimestampUtc | null;
+  appliedRule: string;
+  explanation: string;
 }
 
 export interface TimelinePoint {
