@@ -75,9 +75,11 @@ The app has no server-side API, database, upload destination, or runtime service
 
 The analysis boundary accepts:
 
-- JSON-lines logs with an ISO 8601 timestamp, level, message/error field, and optional exception and multiline stack.
-- Plain-text logs using the documented ISO timestamp and level prefix, with continuation lines for supported multiline stack traces.
-- The versioned `culprit-json` history export containing commit SHA, author, timestamp, subject, repository-relative POSIX file paths, and inclusive changed line ranges.
+- JSON-lines logs with one object per nonblank line. Each object requires `timestamp` (ISO-8601 with `Z` or a numeric offset) and a non-empty string `message` or `error`. It may contain `level` (`trace`, `debug`, `info`, `warn`, `error`, or `fatal`), string `exception`, and string `stack`; other fields are rejected. Records retain their physical line and record numbers.
+- Plain-text logs whose event prefix is exactly `<ISO-8601 timestamp with Z or numeric offset> <lowercase level> <message>`, where level is one of `trace|debug|info|warn|error|fatal`. Indented lines, `at ...` frames, and `Caused by:` lines attach to the preceding event, including a final stack with no trailing newline. Orphan, ambiguous, timestamp-conflicting, and over-limit continuations remain line-aware `STACK_ATTACHMENT` diagnostics.
+- Exactly the versioned `culprit-json` history object: `{ "schemaVersion": 1, "format": "culprit-json", "repository": string, "commits": [...] }`. Each commit requires a lowercase 40-character hexadecimal `sha`, non-empty `author`, offset-bearing `timestamp`, `message` or compatibility alias `subject`, and `files`. Canonical output exposes both `message` and `subject` with the same text. Each file has a repository-relative POSIX `path`, finite non-negative integer `added`/`deleted` counts, and inclusive integer `ranges` where `1 <= start <= end`. Commits sort by UTC timestamp then SHA; files sort by path; ranges sort by start then end.
+
+Timestamps are normalized immediately to UTC ISO strings ending in `Z`; timestamps without an explicit offset are invalid. Repository paths convert backslashes to `/`, remove one leading `./`, and reject absolute or traversal paths. Empty input, malformed JSON, missing fields, unsupported fields/formats, invalid timestamps, history conflicts, and size-limit failures use typed errors with stable codes and nullable source line/record/field context. Recoverable malformed records and stack attachment failures are returned in diagnostics rather than silently dropped. Arbitrary `git log` prose is unsupported.
 
 Arbitrary `git log` prose, additional log formats, whole-repository uploads, and live streams are outside the MVP. The hosted-demo input cap is 1 MiB of log text, 10,000 events, and 100 stack lines per event; the analysis must report a limit rather than silently accepting a larger input.
 
