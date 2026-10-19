@@ -5,10 +5,16 @@ import {
   areaPath,
   bucketIndexFromX,
   buildPlotGeometry,
+  clampLabelX,
+  commitMarkers,
   computeDomain,
+  computeTicks,
   createXScale,
+  domainNote,
+  estimateLabelWidth,
   nearestBucketIndex,
   onsetBand,
+  resolveLabels,
   seriesPath,
   yForValue,
 } from '../../src/ui/timeline-geometry';
@@ -166,5 +172,130 @@ describe('paths', () => {
     expect(Object.keys(geometry).sort()).toEqual(['areaPath', 'linePath', 'overlays']);
 
     expect(buildPlotGeometry(timeline, values, domain, 960, 160, 6)).toEqual(geometry);
+  });
+});
+
+describe('commitMarkers', () => {
+  const domain = computeDomain(CHECKOUT.timeline, CHECKOUT.commits, eligibleOf(CHECKOUT));
+  if (domain === null) throw new Error('expected a domain');
+  const scale = createXScale(domain, 1000);
+
+  it('marks the checkout commits in commit-time order with rank-driven kind, size and label', () => {
+    const markers = commitMarkers(scale, domain, CHECKOUT.commits, CHECKOUT.ranking.suspects);
+    expect(markers.map((marker) => marker.shortSha)).toEqual(['1111111', '2222222', '3333333']);
+    expect(markers.map((marker) => [marker.kind, marker.rank, marker.size, marker.label])).toEqual([
+      ['ranked', 2, 12, '#2'],
+      ['leading', 1, 16, '#1 2222222'],
+      ['other', null, 8, null],
+    ]);
+    expect(markers[0]?.x).toBeCloseTo(0, 2);
+    expect(markers[1]?.x).toBeCloseTo(433.33, 2);
+    expect(markers[2]?.x).toBeCloseTo(1000, 2);
+  });
+
+  it('produces no marker for a commit outside the domain', () => {
+    const outside = [
+      ...CHECKOUT.commits,
+      { sha: 'f'.repeat(40), timestampUtc: '2026-10-19T03:00:00.000Z' },
+      { sha: 'e'.repeat(40), timestampUtc: '2026-10-19T05:00:00.000Z' },
+    ];
+    expect(commitMarkers(scale, domain, outside, CHECKOUT.ranking.suspects)).toHaveLength(3);
+  });
+
+  it('labels a third-ranked suspect "#3" and keeps rank four and below unlabeled', () => {
+    const commits = [1, 2, 3, 4].map((rank) => ({
+      sha: String(rank).repeat(40),
+      timestampUtc: iso(domain.startMs + rank * 60_000),
+    }));
+    const suspects = [1, 2, 3, 4].map((rank) => ({ rank, sha: String(rank).repeat(40), shortSha: String(rank).repeat(7) }));
+    const result = commitMarkers(scale, domain, commits, suspects);
+    expect(result.map((marker) => marker.label)).toEqual(['#1 1111111', '#2', '#3', null]);
+    expect(result.map((marker) => marker.kind)).toEqual(['leading', 'ranked', 'ranked', 'other']);
+    expect(result[3]?.rank).toBeNull();
+  });
+});
+
+describe('resolveLabels', () => {
+  const box = (id: string, priority: number, x: number, y = 0, width = 90, height = 18) => ({ id, priority, x, y, width, height });
+
+  it('keeps only the higher-priority label of an intersecting pair', () => {
+    const kept = resolveLabels([box('rank-1', 1, 830), box('onset', 0, 800)], 1000, { dropRankLabels: false });
+    expect([...kept]).toEqual(['onset']);
+  });
+
+  it('keeps every label that does not overlap', () => {
+    const kept = resolveLabels([box('onset', 0, 0), box('rank-1', 1, 200), box('peak', 3, 400, 40)], 1000, { dropRankLabels: false });
+    expect([...kept].sort()).toEqual(['onset', 'peak', 'rank-1']);
+  });
+
+  it('clamps a label near the right edge inside the plot instead of dropping it', () => {
+    const kept = resolveLabels([box('rank-1', 1, 990, 0, 100)], 1000, { dropRankLabels: false });
+    expect(kept.has('rank-1')).toBe(true);
+    expect(clampLabelX(990, 100, 1000)).toBe(900);
+    expect(clampLabelX(-20, 100, 1000)).toBe(0);
+    expect(clampLabelX(10, 2000, 1000)).toBe(0);
+  });
+
+  it('applies the clamp before testing for overlap', () => {
+    const kept = resolveLabels([box('onset', 0, 950, 0, 100), box('rank-1', 1, 960, 0, 100)], 1000, { dropRankLabels: false });
+    expect([...kept]).toEqual(['onset']);
+  });
+
+  it('never keeps "#2" or "#3" when rank labels are dropped', () => {
+    const candidates = [box('rank-1', 1, 0), box('rank-2', 2, 200), box('rank-3', 2, 400), box('peak', 3, 600)];
+    expect([...resolveLabels(candidates, 1000, { dropRankLabels: true })].sort()).toEqual(['peak', 'rank-1']);
+    expect([...resolveLabels(candidates, 1000, { dropRankLabels: false })].sort()).toEqual(['peak', 'rank-1', 'rank-2', 'rank-3']);
+  });
+
+  it('estimates label width from text length', () => {
+    expect(estimateLabelWidth('#2')).toBe(24);
+    expect(estimateLabelWidth('Onset window')).toBe(104);
+  });
+});
+
+describe('computeTicks', () => {
+  const domain = { startMs: Date.parse('2026-10-19T04:05:00Z'), endMs: Date.parse('2026-10-19T04:35:00Z') };
+
+  it('returns the requested count from the domain start to its end with HH:MM labels', () => {
+    for (const count of [3, 4, 6]) {
+      const { ticks } = computeTicks(domain, count);
+      expect(ticks).toHaveLength(count);
+      expect(ticks[0]?.ms).toBe(domain.startMs);
+      expect(ticks[count - 1]?.ms).toBe(domain.endMs);
+    }
+    expect(computeTicks(domain, 3).ticks.map((tick) => tick.label)).toEqual(['04:05', '04:20', '04:35']);
+    expect(computeTicks(domain, 6).ticks.map((tick) => tick.label)).toEqual(['04:05', '04:11', '04:17', '04:23', '04:29', '04:35']);
+  });
+
+  it('reports the UTC date once', () => {
+    expect(computeTicks(domain, 4).date).toBe('2026-10-19');
+  });
+});
+
+describe('domainNote', () => {
+  it('is null when nothing is hidden (checkout)', () => {
+    const domain = computeDomain(CHECKOUT.timeline, CHECKOUT.commits, eligibleOf(CHECKOUT));
+    if (domain === null) throw new Error('expected a domain');
+    expect(domainNote(domain)).toBeNull();
+  });
+
+  it('names an earlier commit hidden by the clip', () => {
+    const timeline = syntheticTimeline('2026-10-19T12:00:00Z', 3, 5);
+    const commits = [{ sha: 'early', timestampUtc: '2026-10-19T09:00:00Z' }];
+    const domain = computeDomain(timeline, commits, new Set(['early']));
+    if (domain === null) throw new Error('expected a domain');
+    expect(domainNote(domain)).toBe('1 earlier commit is outside this view; see Commits considered.');
+  });
+
+  it('names a later commit after the last interval and agrees in the plural', () => {
+    const timeline = syntheticTimeline('2026-10-19T12:00:00Z', 3, 5);
+    const later = [{ sha: 'late', timestampUtc: '2026-10-19T12:20:00Z' }];
+    const domain = computeDomain(timeline, later, new Set());
+    if (domain === null) throw new Error('expected a domain');
+    expect(domainNote(domain)).toBe('1 later commit is outside this view; see Commits considered.');
+    expect(domainNote({ hiddenEarlier: 2, hiddenLater: 0 })).toBe('2 earlier commits are outside this view; see Commits considered.');
+    expect(domainNote({ hiddenEarlier: 1, hiddenLater: 3 })).toBe(
+      '1 earlier commit is outside this view; see Commits considered. 3 later commits are outside this view; see Commits considered.',
+    );
   });
 });

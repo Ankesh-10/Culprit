@@ -225,3 +225,24 @@ export function buildLogPanelView(stream: AnalysisStream, state: InvestigationSt
     emptyText: events.length === 0 ? LOG_EMPTY_TEXT : null,
   };
 }
+
+export interface TableTwinRow {
+  index: number;
+  interval: string;
+  errors: number;
+  signatures: number;
+  onset: 'Yes' | '—';
+  commits: string;
+}
+
+export interface TableTwinView {
+  rows: TableTwinRow[];
+  total: number;
+  hasMore: boolean;
+}
+
+export function buildTableTwinRows(stream: AnalysisStream, state: InvestigationState): TableTwinView {
+  void stream;
+  void state;
+  throw new Error('not implemented');
+}

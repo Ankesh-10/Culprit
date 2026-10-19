@@ -206,3 +206,88 @@ export function bucketIndexFromX(
 ): number {
   return nearestBucketIndex(timeline, scale.toMs(x), centers);
 }
+
+export type MarkerKind = 'leading' | 'ranked' | 'other';
+
+export interface CommitMarker {
+  sha: string;
+  shortSha: string;
+  kind: MarkerKind;
+  rank: number | null;
+  /** Diamond size in px: 16 leading, 12 ranked, 8 other. */
+  size: number;
+  label: string | null;
+  x: number;
+}
+
+export interface SuspectRef {
+  rank: number;
+  sha: string;
+  shortSha: string;
+}
+
+/** Commit-lane marks in commit-time order; commits outside the domain produce no marker. */
+export function commitMarkers(
+  scale: XScale,
+  domain: Pick<TimelineDomain, 'startMs' | 'endMs'>,
+  commits: readonly CommitTime[],
+  suspects: readonly SuspectRef[],
+): CommitMarker[] {
+  void scale;
+  void domain;
+  void commits;
+  void suspects;
+  throw new Error('not implemented');
+}
+
+export interface LabelCandidate {
+  id: string;
+  priority: number;
+  /** Left edge of the label box. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function estimateLabelWidth(text: string): number {
+  void text;
+  throw new Error('not implemented');
+}
+
+export function clampLabelX(x: number, width: number, plotWidth: number): number {
+  void x;
+  void width;
+  void plotWidth;
+  throw new Error('not implemented');
+}
+
+export function resolveLabels(
+  candidates: readonly LabelCandidate[],
+  plotWidth: number,
+  options: { dropRankLabels: boolean },
+): Set<string> {
+  void candidates;
+  void plotWidth;
+  void options;
+  throw new Error('not implemented');
+}
+
+export interface AxisTick {
+  ms: number;
+  label: string;
+}
+
+export function computeTicks(
+  domain: Pick<TimelineDomain, 'startMs' | 'endMs'>,
+  count: number,
+): { ticks: AxisTick[]; date: string } {
+  void domain;
+  void count;
+  throw new Error('not implemented');
+}
+
+export function domainNote(domain: Pick<TimelineDomain, 'hiddenEarlier' | 'hiddenLater'>): string | null {
+  void domain;
+  throw new Error('not implemented');
+}

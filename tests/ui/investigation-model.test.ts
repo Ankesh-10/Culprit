@@ -7,6 +7,7 @@ import {
   LOG_PAGE_SIZE,
   buildLogPanelView,
   buildReadout,
+  buildTableTwinRows,
   defaultBucketIndex,
   initialInvestigation,
   investigationContext,
@@ -176,5 +177,46 @@ describe('log lines', () => {
     expect(view.rows).toEqual([]);
     expect(view.emptyText).toBe(LOG_EMPTY_TEXT);
     expect(view.heading).toBe('Log lines · 04:25–04:30 UTC · 0 events');
+  });
+});
+
+describe('buildTableTwinRows', () => {
+  it('has one row per interval for every bundled case', () => {
+    const counts = [CHECKOUT, SLOW_BURN, AMBIGUOUS].map((stream) => {
+      const view = buildTableTwinRows(stream, initialInvestigation(stream));
+      expect(view.rows).toHaveLength(stream.timeline.length);
+      expect(view.total).toBe(stream.timeline.length);
+      expect(view.hasMore).toBe(false);
+      return view.rows.length;
+    });
+    expect(counts).toEqual([3, 8, 5]);
+  });
+
+  it('flags the onset window in text', () => {
+    const checkout = buildTableTwinRows(CHECKOUT, initialInvestigation(CHECKOUT));
+    expect(checkout.rows.map((row) => row.onset)).toEqual(['—', '—', 'Yes']);
+    const ambiguous = buildTableTwinRows(AMBIGUOUS, initialInvestigation(AMBIGUOUS));
+    expect(ambiguous.rows.map((row) => row.onset)).toEqual(['—', 'Yes', 'Yes', 'Yes', 'Yes']);
+  });
+
+  it('states interval, errors, signatures and commits for each row', () => {
+    const rows = buildTableTwinRows(CHECKOUT, initialInvestigation(CHECKOUT)).rows;
+    expect(rows[2]).toEqual({
+      index: 2,
+      interval: '04:30–04:35 UTC',
+      errors: 3,
+      signatures: 1,
+      onset: 'Yes',
+      commits: '—',
+    });
+    expect(rows[1]?.errors).toBe(0);
+  });
+
+  it('renders only the visible slice and reports when more exist', () => {
+    const partial = buildTableTwinRows(SLOW_BURN, { ...initialInvestigation(SLOW_BURN), tableVisible: 3 });
+    expect(partial.rows.map((row) => row.index)).toEqual([0, 1, 2]);
+    expect(partial.total).toBe(8);
+    expect(partial.hasMore).toBe(true);
+    expect(buildTableTwinRows(SLOW_BURN, { ...initialInvestigation(SLOW_BURN), tableVisible: 8 }).hasMore).toBe(false);
   });
 });
