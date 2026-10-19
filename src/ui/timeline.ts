@@ -23,6 +23,8 @@ import type { CommitMarker, LabelCandidate, TimelineDomain, XScale } from './tim
 export interface TimelineHandlers {
   /** `openerId` names the control that caused an open so focus can return to it on close. */
   onEvent(event: InvestigationEvent, openerId: string | null): void;
+  /** Open the suspect drawer for a rank; `opener` is the marker that was activated. */
+  onInspect(rank: number, opener: HTMLElement): void;
 }
 
 export interface TimelineView {
@@ -188,7 +190,9 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   });
   const tooltip = el('div', { className: 'chart-tooltip', attrs: { 'aria-hidden': 'true' } });
   tooltip.hidden = true;
-  chartHost.append(slider, tooltip);
+  // Top-three commit markers are real buttons over the (decorative) SVG, outside the slider element.
+  const markerLayer = el('div', { className: 'marker-layer' });
+  chartHost.append(slider, markerLayer, tooltip);
 
   const note = domainNote(domain);
   const noteLine = note === null ? null : el('p', { className: 'domain-note', text: note });
@@ -414,6 +418,32 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     }
 
     plot.append(...laneMarks, crosshair, hoverLine, ring);
+
+    // Keyboard and pointer targets for the leading and ranked markers; other commits stay non-interactive.
+    const activeMarker = document.activeElement;
+    const focusedRank = activeMarker instanceof HTMLElement && markerLayer.contains(activeMarker) ? activeMarker.getAttribute('data-suspect-rank') : null;
+    clear(markerLayer);
+    const rankedMarkers = markers.filter((marker) => marker.rank !== null).sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+    for (const marker of rankedMarkers) {
+      if (marker.rank === null) continue;
+      const rank = marker.rank;
+      const hit = el('button', {
+        className: 'marker-hit',
+        attrs: {
+          type: 'button',
+          role: 'button',
+          tabindex: '0',
+          'aria-label': `Open suspect #${rank} ${marker.shortSha}`,
+          'data-suspect-rank': String(rank),
+        },
+      });
+      hit.style.left = `${PAD_LEFT + marker.x}px`;
+      hit.style.top = `${PAD_TOP + laneCenter}px`;
+      hit.style.zIndex = String(4 - rank);
+      hit.addEventListener('click', () => handlers.onInspect(rank, hit));
+      markerLayer.append(hit);
+    }
+    if (focusedRank !== null) markerLayer.querySelector<HTMLElement>(`[data-suspect-rank="${focusedRank}"]`)?.focus();
 
     // Direct labels: only those that survive the priority and collision rules; markers always stay.
     const kept = resolveLabels(labelCandidates, plotWidth, { dropRankLabels: viewport < 640 });

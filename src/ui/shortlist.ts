@@ -5,7 +5,19 @@ import type { ConsideredRow, ShortlistRow, ShortlistView } from './view-model';
 const SCORE_CAPTION = 'rounded for display';
 const NONE = '\u2014';
 
-function renderCard(row: ShortlistRow): HTMLElement {
+export interface ShortlistHandlers {
+  /** Open the suspect drawer for a rank; `opener` is the control that asked for it. */
+  onInspect(rank: number, opener: HTMLElement): void;
+}
+
+function renderCard(row: ShortlistRow, handlers: ShortlistHandlers): HTMLElement {
+  const inspect = el('button', {
+    className: 'button-secondary',
+    text: 'Inspect evidence',
+    attrs: { type: 'button', 'data-suspect-rank': String(row.rank), 'aria-label': `Inspect evidence for ${row.rankLabel} ${row.shortSha}` },
+  });
+  inspect.addEventListener('click', () => handlers.onInspect(row.rank, inspect));
+
   const heading: Array<HTMLElement | SVGElement> = [
     icon('diamond', row.diamond === 'leading' ? 'icon rank-diamond is-leading' : 'icon rank-diamond is-ranked'),
     el('span', { className: 'rank-label', text: row.rankLabel }),
@@ -27,17 +39,18 @@ function renderCard(row: ShortlistRow): HTMLElement {
       el('span', { className: 'chip', text: row.traceChip }),
       el('span', { className: 'lineup-matches', text: row.matches }),
     ]),
+    el('div', { className: 'lineup-actions' }, [inspect]),
   ]);
 }
 
-export function renderShortlist(view: ShortlistView): HTMLElement {
+export function renderShortlist(view: ShortlistView, handlers: ShortlistHandlers): HTMLElement {
   const headingId = 'lineup-title';
   return el('section', { className: 'lineup', attrs: { 'aria-labelledby': headingId } }, [
     el('div', { className: 'lineup-title-row' }, [
       el('h2', { text: view.heading, attrs: { id: headingId } }),
       el('span', { className: 'lineup-count', text: view.countText }),
     ]),
-    el('ol', { className: 'lineup-list' }, view.rows.map(renderCard)),
+    el('ol', { className: 'lineup-list' }, view.rows.map((row) => renderCard(row, handlers))),
   ]);
 }
 

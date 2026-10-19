@@ -164,11 +164,11 @@ function logEvent(path: string, line: number): AnalysisStream['ranking']['suspec
 const PAYMENT = 'src/checkout/payment.ts';
 
 describe('changed files and line ranges', () => {
-  it('lists the checkout leader files in commit order with counts, ranges and the stack-frame overlap', () => {
+  it('lists the checkout leader files in the stream order (by path) with counts, ranges and the stack-frame overlap', () => {
     const view = drawer(CHECKOUT, 1);
     expect(view.files).toEqual([
-      { path: PAYMENT, counts: `+46 ${MINUS}9`, ranges: [{ text: 'L104\u2013126', overlap: 'Overlaps stack frame at line 118' }] },
-      { path: 'src/checkout/handler.ts', counts: `+8 ${MINUS}2`, ranges: [{ text: 'L36\u201349', overlap: null }] },
+      { path: 'src/checkout/handler.ts', counts: `+8 ${MINUS}2`, ranges: [{ text: 'L36–49', overlap: null }] },
+      { path: PAYMENT, counts: `+46 ${MINUS}9`, ranges: [{ text: 'L104–126', overlap: 'Overlaps stack frame at line 118' }] },
     ]);
     expect(view.diffNote).toBe(DIFF_NOTE);
   });
@@ -189,7 +189,8 @@ describe('changed files and line ranges', () => {
 
   it('uses the smallest cited line inside the inclusive range, and ignores other paths and outside lines', () => {
     const lines = (...numbers: number[]) => withLeadingReferences(CHECKOUT, numbers.map((line) => logEvent(PAYMENT, line)));
-    const overlapOf = (stream: AnalysisStream): string | null => drawer(stream, 1).files[0]?.ranges[0]?.overlap ?? null;
+    const overlapOf = (stream: AnalysisStream): string | null =>
+      drawer(stream, 1).files.find((file) => file.path === PAYMENT)?.ranges[0]?.overlap ?? null;
     expect(overlapOf(lines(118, 110, 120))).toBe('Overlaps stack frame at line 110');
     expect(overlapOf(lines(104))).toBe('Overlaps stack frame at line 104');
     expect(overlapOf(lines(126))).toBe('Overlaps stack frame at line 126');
@@ -205,7 +206,7 @@ describe('changed files and line ranges', () => {
         commit.sha.startsWith('2222222') ? { ...commit, files: [{ path: PAYMENT, added: 1, deleted: 0, ranges: [{ start: 7, end: 7 }] }] } : commit,
       ),
     };
-    expect(drawer(stream, 1).files[0]?.ranges[0]?.text).toBe('L7');
+    expect(drawer(stream, 1).files.map((file) => file.ranges.map((range) => range.text))).toEqual([['L7']]);
   });
 });
 

@@ -1420,6 +1420,145 @@ a { color: var(--color-ink); text-decoration: underline; }
   line-height: var(--leading-label);
 }
 
+/* Drawer: changed files and evidence */
+
+.file-list,
+.range-list,
+.evidence-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-list,
+.evidence-items {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.file-item p,
+.evidence-item p { margin: 0; }
+
+.file-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  overflow-wrap: anywhere;
+}
+
+.file-counts {
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-label);
+}
+
+.range-list {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.range-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.range-text {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-empty,
+.drawer-diff-note {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.drawer-empty { margin-top: 0; }
+
+.evidence-item {
+  display: grid;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.evidence-item:first-child { padding-top: 0; border-top: 0; }
+
+.evidence-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.evidence-location {
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  overflow-wrap: anywhere;
+}
+
+.evidence-detail {
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  overflow-wrap: anywhere;
+}
+
+.evidence-item > button {
+  justify-self: start;
+  margin-top: var(--space-xs);
+}
+
+/* Evidence preview and lineup actions */
+
+.see-all-evidence { margin-top: var(--space-sm); }
+
+.lineup-actions { display: flex; }
+
+@media (max-width: 639px) {
+  .lineup-actions > button,
+  .see-all-evidence { width: 100%; }
+}
+
+/* Timeline: top-three commit markers are buttons over the decorative SVG. */
+
+.marker-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marker-hit {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translate(-50%, -50%);
+}
+
+@media (pointer: coarse) {
+  .marker-hit { width: 44px; height: 44px; }
+}
+
+.marker-hit:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 0;
+}
+
 /* Forced colors keep outlines, rules and icons visible. */
 
 @media (forced-colors: active) {
@@ -1477,6 +1616,7 @@ a { color: var(--color-ink); text-decoration: underline; }
   .contribution-fill { background: Highlight; forced-color-adjust: none; }
 
   .contribution-bar { border: 1px solid CanvasText; }
+  .marker-hit:focus-visible { outline: 2px solid Highlight; }
   .suspect-drawer { border: 1px solid CanvasText; }
   .drawer-nav-button:disabled { color: GrayText; border-color: GrayText; }
 

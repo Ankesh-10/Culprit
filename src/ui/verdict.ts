@@ -98,8 +98,14 @@ function renderScoreRow(view: VerdictView): HTMLElement {
   ]);
 }
 
-function renderEvidencePreview(lines: readonly string[]): HTMLElement | null {
+function renderEvidencePreview(lines: readonly string[], handlers: VerdictHandlers): HTMLElement | null {
   if (lines.length === 0) return null;
+  const seeAll = el('button', {
+    className: 'button-secondary see-all-evidence',
+    text: 'See all evidence',
+    attrs: { type: 'button', 'data-suspect-rank': '1' },
+  });
+  seeAll.addEventListener('click', () => handlers.onInspect(1, seeAll));
   return el('div', { className: 'evidence-preview' }, [
     el('p', { className: 'verdict-label', text: 'Evidence preview' }),
     el(
@@ -107,6 +113,7 @@ function renderEvidencePreview(lines: readonly string[]): HTMLElement | null {
       { className: 'evidence-list' },
       lines.map((line) => el('li', { text: line })),
     ),
+    seeAll,
   ]);
 }
 
@@ -123,7 +130,7 @@ function renderActions(handlers: VerdictHandlers): HTMLElement {
 export function renderVerdict(view: VerdictView, handlers: VerdictHandlers): HTMLElement {
   const headingId = 'verdict-title';
   const main: HTMLElement[] = [el('p', { className: 'verdict-interpretation', text: view.interpretation }), renderHeadline(view)];
-  const preview = renderEvidencePreview(view.evidencePreview);
+  const preview = renderEvidencePreview(view.evidencePreview, handlers);
   if (preview !== null) main.push(preview);
 
   const children: HTMLElement[] = [

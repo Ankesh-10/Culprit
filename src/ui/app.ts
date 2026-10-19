@@ -80,6 +80,12 @@ export function mountApp(doc: Document): void {
       const view = buildDrawerView(activeStream, rank);
       if (view !== null) updateSuspectDrawer(drawer, view, drawerHandlers);
     },
+    onShowLogLines: (signature) => {
+      // Leave the drawer without returning focus to its opener: focus belongs to the log panel heading.
+      dismissSuspectDrawer(drawer);
+      dispatchInvestigation({ type: 'set-filter', signature }, null);
+      dispatchInvestigation({ type: 'open-log-lines', scope: 'signature' }, null);
+    },
   };
 
   /** Every opener (verdict, lineup, timeline marker) lands here with the control that was activated. */
@@ -155,7 +161,7 @@ export function mountApp(doc: Document): void {
       investigation = initialInvestigation(stream);
       logOpenerId = null;
     }
-    timelineView = renderTimeline(stream, investigation, { onEvent: dispatchInvestigation });
+    timelineView = renderTimeline(stream, investigation, { onEvent: dispatchInvestigation, onInspect: inspectSuspect });
     signaturesView = renderSignatures(buildSignatureRows(stream, investigation), { onEvent: dispatchInvestigation });
     logSlot = el('div', { className: 'log-slot' });
     renderLogPanel();
@@ -177,7 +183,7 @@ export function mountApp(doc: Document): void {
     if (view === null) return el('p', { text: stream.ranking.interpretation });
     const parts: HTMLElement[] = [renderVerdict(view, { onInspect: inspectSuspect })];
     const shortlist = buildShortlistView(stream);
-    if (shortlist !== null) parts.push(renderShortlist(shortlist));
+    if (shortlist !== null) parts.push(renderShortlist(shortlist, { onInspect: inspectSuspect }));
     parts.push(renderConsidered(buildConsideredRows(stream)));
     parts.push(mountInvestigation(stream));
     return el('div', { className: 'result-stack' }, parts);

@@ -1,6 +1,6 @@
-import type { AnalysisStream, SignalName } from '../core/model';
+import type { AnalysisStream, ChangedFile, EvidenceReference, EvidenceType, SignalName } from '../core/model';
 import { toAnalysisResult } from '../core/pipeline';
-import { formatScore, formatTimeGap, formatUtcDateTime, traceMatchLabel } from './format';
+import { formatLineRange, formatPathRange, formatScore, formatTimeGap, formatUtcDateTime, traceMatchLabel } from './format';
 
 /** Plain-language titles for the four ranking signals. Titles are static; explanations always come from data. */
 export const SIGNAL_TITLES: Record<SignalName, string> = {
@@ -72,6 +72,15 @@ export interface DrawerView {
   evidence: DrawerEvidenceItem[];
 }
 
+const EVIDENCE_LABELS: Record<EvidenceType, string> = {
+  'log-event': 'Log event',
+  'error-group': 'Error group',
+  'file-range': 'File range',
+  feature: 'Feature',
+};
+
+const MINUS = '−';
+
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
@@ -88,9 +97,50 @@ function signalMath(value: number, weight: number, contribution: number): string
   return `value ${formatScore(value, 3)} × weight ${formatScore(weight, 3)} = ${formatScore(contribution, 3)}`;
 }
 
+/** The smallest cited stack-frame line of this path that falls inside the inclusive range, else null. */
+function overlapText(references: readonly EvidenceReference[], path: string, start: number, end: number): string | null {
+  let smallest: number | null = null;
+  for (const reference of references) {
+    if (reference.type !== 'log-event' || reference.path !== path || reference.lineStart === null) continue;
+    if (reference.lineStart < start || reference.lineStart > end) continue;
+    if (smallest === null || reference.lineStart < smallest) smallest = reference.lineStart;
+  }
+  return smallest === null ? null : `Overlaps stack frame at line ${smallest}`;
+}
+
+function buildFile(file: ChangedFile, references: readonly EvidenceReference[]): DrawerFile {
+  return {
+    path: file.path,
+    counts: `+${file.added} ${MINUS}${file.deleted}`,
+    ranges: file.ranges.map((range) => ({
+      text: formatLineRange(range.start, range.end),
+      overlap: overlapText(references, file.path, range.start, range.end),
+    })),
+  };
+}
+
+/** Event id to the signature of the error group that owns it. */
+function signatureByEventId(stream: AnalysisStream): Map<string, string> {
+  const owners = new Map<string, string>();
+  for (const group of stream.errors) {
+    for (const eventId of group.eventIds) if (!owners.has(eventId)) owners.set(eventId, group.signature);
+  }
+  return owners;
+}
+
+function evidenceAction(reference: EvidenceReference, owners: ReadonlyMap<string, string>): { signature: string } | null {
+  if (reference.type === 'error-group') return { signature: reference.sourceId };
+  if (reference.type === 'log-event') {
+    const signature = owners.get(reference.sourceId);
+    return signature === undefined ? null : { signature };
+  }
+  return null;
+}
+
 /** The drawer for the suspect with this rank, or null when the lineup has no such rank. */
 export function buildDrawerView(stream: AnalysisStream, rank: number): DrawerView | null {
   const suspects = toAnalysisResult(stream).suspects;
+  const owners = signatureByEventId(stream);
   const index = suspects.findIndex((entry) => entry.rank === rank);
   const suspect = suspects[index];
   if (suspect === undefined) return null;
@@ -125,8 +175,15 @@ export function buildDrawerView(stream: AnalysisStream, rank: number): DrawerVie
     },
     signals,
     total: `Total suspicion score ${formatScore(suspect.score, 3)} (sum of the contributions above), rounded for display.`,
-    files: [],
-    diffNote: '',
-    evidence: [],
+    files: (stream.commits.find((commit) => commit.sha === suspect.sha)?.files ?? []).map((file) => buildFile(file, suspect.evidenceReferences)),
+    diffNote: DIFF_NOTE,
+    evidence: suspect.evidenceReferences.map(
+      (reference): DrawerEvidenceItem => ({
+        typeLabel: EVIDENCE_LABELS[reference.type],
+        location: reference.path === null ? null : formatPathRange(reference.path, reference.lineStart, reference.lineEnd),
+        detail: reference.detail,
+        action: evidenceAction(reference, owners),
+      }),
+    ),
   };
 }

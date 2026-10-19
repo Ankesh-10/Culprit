@@ -1,6 +1,7 @@
 import { clear, el, icon } from './dom';
 import { DRAWER_CAVEAT } from './drawer-model';
-import type { DrawerSignalRow, DrawerView } from './drawer-model';
+import type { DrawerEvidenceItem, DrawerFile, DrawerSignalRow, DrawerView } from './drawer-model';
+import { NO_RANGES_TEXT } from './view-model';
 import { renderScoreMeter } from './verdict';
 
 export const DRAWER_TITLE_ID = 'drawer-title';
@@ -8,6 +9,8 @@ export const DRAWER_TITLE_ID = 'drawer-title';
 export interface DrawerHandlers {
   /** Re-render the open drawer for a neighbouring suspect. */
   onStep(rank: number): void;
+  /** Close the drawer, filter by this signature and move focus to its log lines. */
+  onShowLogLines(signature: string): void;
 }
 
 interface DrawerSession {
@@ -105,12 +108,71 @@ function renderWhy(view: DrawerView): HTMLElement {
   ]);
 }
 
+function renderFile(file: DrawerFile): HTMLElement {
+  const ranges =
+    file.ranges.length === 0
+      ? [el('li', { className: 'range-row', text: NO_RANGES_TEXT })]
+      : file.ranges.map((range) => {
+          const children: HTMLElement[] = [el('span', { className: 'range-text', text: range.text })];
+          if (range.overlap !== null) children.push(el('span', { className: 'chip', text: range.overlap }));
+          return el('li', { className: 'range-row' }, children);
+        });
+  return el('li', { className: 'file-item' }, [
+    el('p', { className: 'file-path', text: file.path }),
+    el('p', { className: 'file-counts', text: file.counts }),
+    el('ul', { className: 'range-list' }, ranges),
+  ]);
+}
+
+function renderFiles(view: DrawerView): HTMLElement {
+  const children: HTMLElement[] =
+    view.files.length === 0
+      ? [el('p', { className: 'drawer-empty', text: NO_RANGES_TEXT })]
+      : [el('ul', { className: 'file-list' }, view.files.map(renderFile))];
+  children.push(el('p', { className: 'drawer-diff-note', text: view.diffNote }));
+  return section('Changed files and line ranges', children);
+}
+
+function renderEvidenceItem(item: DrawerEvidenceItem, handlers: DrawerHandlers): HTMLElement {
+  const head: HTMLElement[] = [el('span', { className: 'chip', text: item.typeLabel })];
+  if (item.location !== null) head.push(el('span', { className: 'evidence-location', text: item.location }));
+  const children: HTMLElement[] = [el('div', { className: 'evidence-head' }, head), el('p', { className: 'evidence-detail', text: item.detail })];
+  const action = item.action;
+  if (action !== null) {
+    children.push(
+      el('button', {
+        className: 'button-secondary',
+        text: 'Show matching log lines',
+        attrs: { type: 'button', 'aria-label': `Show matching log lines: ${action.signature}` },
+        on: { click: () => handlers.onShowLogLines(action.signature) },
+      }),
+    );
+  }
+  return el('li', { className: 'evidence-item' }, children);
+}
+
+function renderEvidence(view: DrawerView, handlers: DrawerHandlers): HTMLElement {
+  return section('Evidence', [
+    el(
+      'ul',
+      { className: 'evidence-items' },
+      view.evidence.map((item) => renderEvidenceItem(item, handlers)),
+    ),
+  ]);
+}
+
 /** Header and sections for one suspect; text reaches the page only as text nodes and attributes. */
 export function renderDrawerContent(view: DrawerView, handlers: DrawerHandlers, close: () => void = () => undefined): DocumentFragment {
   const fragment = document.createDocumentFragment();
   fragment.append(
     renderHeader(view, handlers, close),
-    el('div', { className: 'drawer-body' }, [renderSummary(view), renderWhy(view), section('Caveat', [el('p', { className: 'drawer-caveat', text: DRAWER_CAVEAT })])]),
+    el('div', { className: 'drawer-body' }, [
+      renderSummary(view),
+      renderWhy(view),
+      renderFiles(view),
+      renderEvidence(view, handlers),
+      section('Caveat', [el('p', { className: 'drawer-caveat', text: DRAWER_CAVEAT })]),
+    ]),
   );
   return fragment;
 }
