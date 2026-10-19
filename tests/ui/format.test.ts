@@ -3,6 +3,7 @@ import {
   formatCompactCount,
   formatDuration,
   formatGapShort,
+  formatInteger,
   formatLineRange,
   formatMiB,
   formatPathRange,
@@ -35,6 +36,21 @@ describe('UTC formatters', () => {
       expect(formatUtcSeconds(input)).toBe(input);
     }
     expect(formatUtcInterval('bad', '2026-10-19T04:35:00.000Z')).toBe('bad–2026-10-19T04:35:00.000Z');
+  });
+});
+
+describe('formatInteger', () => {
+  it('groups digits by three without a locale API', () => {
+    expect(formatInteger(0)).toBe('0');
+    expect(formatInteger(100)).toBe('100');
+    expect(formatInteger(999)).toBe('999');
+    expect(formatInteger(1000)).toBe('1,000');
+    expect(formatInteger(10000)).toBe('10,000');
+    expect(formatInteger(1048576)).toBe('1,048,576');
+  });
+
+  it('keeps the sign of negative numbers', () => {
+    expect(formatInteger(-1234)).toBe('-1,234');
   });
 });
 
@@ -111,6 +127,7 @@ describe('time zone independence', () => {
       formatMiB(1572864),
       formatPathRange('src/a.ts', 1, 9),
       formatCompactCount(1500),
+      formatInteger(1048576),
     ];
   }
 

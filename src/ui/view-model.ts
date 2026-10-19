@@ -356,3 +356,40 @@ export function buildStatusView(state: PageState): StatusView {
       return doneStatus(state.stream);
   }
 }
+
+export interface TrustFooterItem {
+  code: string | null;
+  line: string | null;
+  message: string;
+}
+
+export interface TrustFooterView {
+  heading: string;
+  countChip: string | null;
+  items: TrustFooterItem[];
+  assumptionsSummary: string;
+  rationale: string;
+  assumptions: string[];
+  versions: string;
+  provenance: string[];
+  limits: string;
+  utcNote: string;
+  truncationBanner: string | null;
+}
+
+/** Stub (RED): replaced by the real footer view. */
+export function buildTrustFooterView(_stream: AnalysisStream): TrustFooterView {
+  return {
+    heading: '',
+    countChip: null,
+    items: [],
+    assumptionsSummary: '',
+    rationale: '',
+    assumptions: [],
+    versions: '',
+    provenance: [],
+    limits: '',
+    utcNote: '',
+    truncationBanner: null,
+  };
+}

@@ -81,6 +81,11 @@ export function plural(count: number, singular: string, pluralForm: string = `${
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
+/** Stub (RED): replaced by the grouped implementation. */
+export function formatInteger(n: number): string {
+  return String(n);
+}
+
 export function formatMiB(bytes: number): string {
   return `${(bytes / 1048576).toFixed(1)} MiB`;
 }

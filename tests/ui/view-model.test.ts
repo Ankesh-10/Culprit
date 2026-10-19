@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AnalysisInput, AnalysisStream } from '../../src/core/model';
 import { findCase, toAnalysisInput } from '../../src/ui/cases';
 import { analyze } from '../../src/core/pipeline';
-import { buildConsideredRows, buildShortlistView, buildVerdictView } from '../../src/ui/view-model';
+import { buildConsideredRows, buildShortlistView, buildTrustFooterView, buildVerdictView } from '../../src/ui/view-model';
 import { handleAnalyzeRequest } from '../../src/worker/protocol';
 
 function bundledStream(id: string): AnalysisStream {
@@ -199,5 +199,76 @@ describe('wording guard', () => {
     const all = [...strings(buildVerdictView(stream)), ...strings(buildShortlistView(stream)), ...strings(buildConsideredRows(stream))];
     expect(all.length).toBeGreaterThan(10);
     expect(all.filter((text) => BANNED.test(text))).toEqual([]);
+  });
+});
+
+describe('buildTrustFooterView', () => {
+  const UTC_NOTE = 'All timestamps are normalized to UTC and shown without local conversion.';
+  const LIMITS = 'Limits: 1 MiB of log text, 10,000 events, 100 stack lines per event';
+
+  it('lists the single warning of the ambiguous case with a count chip and every caveat', () => {
+    const view = buildTrustFooterView(AMBIGUOUS);
+    expect(view.heading).toBe('Warnings and caveats');
+    expect(view.countChip).toBe('1 warning');
+    expect(view.items).toEqual([
+      { code: null, line: null, message: 'No grouped application stack path overlaps the supplied history files; evidence remains weak or competing.' },
+    ]);
+    expect(view.assumptionsSummary).toBe('UTC · local · not proof');
+    expect(view.assumptions).toEqual(AMBIGUOUS.assumptions);
+    expect(view.assumptions.length).toBeGreaterThan(0);
+    expect(view.rationale).toBe(AMBIGUOUS.ranking.confidence.rationale);
+    expect(view.versions).toBe('analysis-v1 · scoring-v1 · schema 1');
+    expect(view.limits).toBe(LIMITS);
+    expect(view.utcNote).toBe(UTC_NOTE);
+    expect(view.truncationBanner).toBeNull();
+  });
+
+  it('has no chip and no items for the checkout case but keeps the caveats', () => {
+    const view = buildTrustFooterView(CHECKOUT);
+    expect(view.countChip).toBeNull();
+    expect(view.items).toEqual([]);
+    expect(view.assumptionsSummary).toBe('UTC · local · not proof');
+    expect(view.limits).toBe(LIMITS);
+    expect(view.utcNote).toBe(UTC_NOTE);
+  });
+
+  it('describes provenance with sources, formats and counts', () => {
+    expect(buildTrustFooterView(CHECKOUT).provenance).toEqual([
+      'Logs: fixtures/incidents/checkout-outage/logs.jsonl (jsonl, 6 events)',
+      'History: fixtures/incidents/checkout-outage/history.json (culprit-json, 3 commits)',
+    ]);
+  });
+
+  it('uses singular nouns for single counts in provenance', () => {
+    const single = { ...CHECKOUT, provenance: { ...CHECKOUT.provenance, eventCount: 1, commitCount: 1 } };
+    expect(buildTrustFooterView(single).provenance).toEqual([
+      'Logs: fixtures/incidents/checkout-outage/logs.jsonl (jsonl, 1 event)',
+      'History: fixtures/incidents/checkout-outage/history.json (culprit-json, 1 commit)',
+    ]);
+  });
+
+  it('shows the truncation banner and renders diagnostics after warnings', () => {
+    const synthetic: AnalysisStream = {
+      ...AMBIGUOUS,
+      limits: { ...AMBIGUOUS.limits, truncated: true },
+      diagnostics: [
+        { source: 'logs', code: 'MALFORMED_RECORD', message: 'Record could not be read.', line: 4, record: null },
+        { source: 'history', code: 'EMPTY_RANGE', message: 'No ranges.', line: null, record: 2 },
+      ],
+    };
+    const view = buildTrustFooterView(synthetic);
+    expect(view.truncationBanner).toBe('Input was truncated at the limit; results use only the lines that were read.');
+    expect(view.countChip).toBe('3 warnings');
+    expect(view.items.map((item) => [item.code, item.line])).toEqual([
+      [null, null],
+      ['logs/MALFORMED_RECORD', 'line 4'],
+      ['history/EMPTY_RANGE', null],
+    ]);
+    expect(view.items[1]?.message).toBe('Record could not be read.');
+  });
+
+  it('formats a limit that is not a whole MiB with one decimal', () => {
+    const odd = { ...CHECKOUT, limits: { ...CHECKOUT.limits, maxLogBytes: 1572864 } };
+    expect(buildTrustFooterView(odd).limits).toBe('Limits: 1.5 MiB of log text, 10,000 events, 100 stack lines per event');
   });
 });
