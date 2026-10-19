@@ -1216,6 +1216,72 @@ a { color: var(--color-ink); text-decoration: underline; }
   .verdict-actions > button { width: 100%; }
 }
 
+/* Copy control: the button keeps its label; the status line and fallback box carry the outcome. */
+
+.copy-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* In the verdict actions row the button joins the row and the feedback wraps onto its own line. */
+.verdict-actions > .copy-control { display: contents; }
+
+.copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.copy-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.copy-status:empty {
+  flex-basis: 0;
+  width: 0;
+}
+
+.copy-status-icon { flex: none; margin-top: 2px; }
+.copy-status.is-copied .copy-status-icon { color: var(--color-good); }
+.copy-status.is-fallback .copy-status-icon { color: var(--color-warning); }
+
+.copy-fallback {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
+.copy-fallback-text {
+  display: block;
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-control-border);
+  border-radius: 4px;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  resize: vertical;
+}
+
+.copy-under-panel { margin-top: var(--space-md); }
+
+@media (max-width: 639px) {
+  .verdict-actions .copy-button { width: 100%; justify-content: center; }
+}
+
 /* Suspect drawer: a native modal dialog anchored right, full screen on phones, no animation. */
 
 .suspect-drawer {

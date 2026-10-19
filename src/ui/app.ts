@@ -2,13 +2,15 @@ import { createAnalysisClient } from './analysis-client';
 import { BUNDLED_CASES, toAnalysisInput } from './cases';
 import type { BundledCase } from './cases';
 import { renderCasePicker } from './case-picker';
+import { buildPostmortemMarkdown, copyText, markdownLineCount, renderCopyControl } from './copy';
+import type { CopyControl } from './copy';
 import { clear, el } from './dom';
 import { dismissSuspectDrawer, openSuspectDrawer, updateSuspectDrawer } from './drawer';
 import type { DrawerHandlers } from './drawer';
 import { buildDrawerView } from './drawer-model';
 import { registerLocalFonts } from './fonts';
-import { initialPageState, reducePage, scheduleLoadingBanner } from './state';
-import type { PageEvent, PageState, Scheduler, SettledState } from './state';
+import { initialCopyFeedback, initialPageState, reduceCopyFeedback, reducePage, scheduleLoadingBanner } from './state';
+import type { CopyEvent, CopyFeedback, PageEvent, PageState, Scheduler, SettledState } from './state';
 import { renderEmptyState, renderErrorState, renderLoadingPlaceholder, renderStatePanel, renderStatus } from './status';
 import {
   buildLogPanelView,
@@ -57,6 +59,7 @@ export function mountApp(doc: Document): void {
   const skipTimeline = required<HTMLElement>(doc, 'skip-timeline');
   const drawer = required<HTMLDialogElement>(doc, 'suspect-drawer');
   const client = createAnalysisClient();
+  drawer.addEventListener('close', () => dispatchCopy({ type: 'reset' }));
   const sparklines = new Map<string, readonly number[]>();
   registerLocalFonts();
 
@@ -74,8 +77,40 @@ export function mountApp(doc: Document): void {
   let logPanel: LogLinesPanel | null = null;
   let logOpenerId: string | null = null;
 
+  let copyFeedback: CopyFeedback = initialCopyFeedback;
+  let copyControl: CopyControl | null = null;
+
+  /** Copy feedback lives until the next result, drawer interaction or copy; there is no timer. */
+  function dispatchCopy(event: CopyEvent): void {
+    const next = reduceCopyFeedback(copyFeedback, event);
+    if (next === copyFeedback) return;
+    copyFeedback = next;
+    copyControl?.update(next);
+  }
+
+  async function copyPostmortem(): Promise<void> {
+    const stream = activeStream;
+    if (stream === null) return;
+    const markdown = buildPostmortemMarkdown(stream);
+    const outcome = await copyText(markdown, { clipboard: navigator.clipboard, protocol: location.protocol });
+    // A different result may have arrived while the clipboard prompt was open; its feedback is not this one's.
+    if (activeStream !== stream) return;
+    if (outcome === 'copied') dispatchCopy({ type: 'succeeded', lines: markdownLineCount(markdown) });
+    else dispatchCopy({ type: 'fell-back', markdown });
+  }
+
+  function createCopyControl(): CopyControl {
+    const control = renderCopyControl(copyFeedback, {
+      onCopy: () => void copyPostmortem(),
+      onHide: () => dispatchCopy({ type: 'hide' }),
+    });
+    copyControl = control;
+    return control;
+  }
+
   const drawerHandlers: DrawerHandlers = {
     onStep: (rank) => {
+      dispatchCopy({ type: 'reset' });
       if (activeStream === null) return;
       const view = buildDrawerView(activeStream, rank);
       if (view !== null) updateSuspectDrawer(drawer, view, drawerHandlers);
@@ -93,6 +128,7 @@ export function mountApp(doc: Document): void {
     if (activeStream === null) return;
     const view = buildDrawerView(activeStream, rank);
     if (view === null) return;
+    dispatchCopy({ type: 'reset' });
     openSuspectDrawer(drawer, view, opener, drawerHandlers, () => title.focus());
   }
 
@@ -174,14 +210,14 @@ export function mountApp(doc: Document): void {
     const stream = settled.stream;
     const panel = buildStatePanel(stream);
     if (panel !== null) {
-      const parts: HTMLElement[] = [renderStatePanel(panel)];
+      const parts: HTMLElement[] = [renderStatePanel(panel), el('div', { className: 'copy-under-panel' }, [createCopyControl().element])];
       if (deriveResultKind(stream) === 'no-eligible-commits') parts.push(renderConsidered(buildConsideredRows(stream)));
       parts.push(mountInvestigation(stream));
       return el('div', { className: 'result-stack' }, parts);
     }
     const view = buildVerdictView(stream);
     if (view === null) return el('p', { text: stream.ranking.interpretation });
-    const parts: HTMLElement[] = [renderVerdict(view, { onInspect: inspectSuspect })];
+    const parts: HTMLElement[] = [renderVerdict(view, { onInspect: inspectSuspect }, [createCopyControl().element])];
     const shortlist = buildShortlistView(stream);
     if (shortlist !== null) parts.push(renderShortlist(shortlist, { onInspect: inspectSuspect }));
     parts.push(renderConsidered(buildConsideredRows(stream)));
@@ -244,6 +280,7 @@ export function mountApp(doc: Document): void {
           hasResult = true;
           renderPicker();
         }
+        if (previous.phase !== 'done' || previous.requestId !== state.requestId) dispatchCopy({ type: 'reset' });
         title.hidden = false;
         title.textContent = `Result: ${state.label}`;
         showBody(renderSettled(state));

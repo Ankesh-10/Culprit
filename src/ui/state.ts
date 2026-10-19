@@ -59,3 +59,33 @@ export function scheduleLoadingBanner(
 ): () => void {
   return schedule(() => dispatch({ type: 'banner-due', requestId }), LOADING_BANNER_DELAY_MS);
 }
+
+export const COPY_FALLBACK_MESSAGE = "Couldn't copy automatically. The Markdown is selected below. Press Ctrl+C (Cmd+C on Mac).";
+
+/** Outcome of the "Copy Markdown postmortem" action; it lives until the next result, drawer interaction or copy. */
+export type CopyFeedback =
+  | { kind: 'idle' }
+  | { kind: 'copied'; message: string }
+  | { kind: 'fallback'; markdown: string; message: string };
+
+export type CopyEvent =
+  | { type: 'succeeded'; lines: number }
+  | { type: 'fell-back'; markdown: string }
+  | { type: 'reset' }
+  | { type: 'hide' };
+
+export const initialCopyFeedback: CopyFeedback = { kind: 'idle' };
+
+/** Pure transition function with no timers: feedback stays until another event replaces it. */
+export function reduceCopyFeedback(state: CopyFeedback, event: CopyEvent): CopyFeedback {
+  switch (event.type) {
+    case 'succeeded':
+      return { kind: 'copied', message: `Markdown postmortem copied (${event.lines} ${event.lines === 1 ? 'line' : 'lines'}).` };
+    case 'fell-back':
+      return { kind: 'fallback', markdown: event.markdown, message: COPY_FALLBACK_MESSAGE };
+    case 'reset':
+      return state.kind === 'idle' ? state : initialCopyFeedback;
+    case 'hide':
+      return state.kind === 'fallback' ? initialCopyFeedback : state;
+  }
+}

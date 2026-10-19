@@ -117,17 +117,18 @@ function renderEvidencePreview(lines: readonly string[], handlers: VerdictHandle
   ]);
 }
 
-function renderActions(handlers: VerdictHandlers): HTMLElement {
+function renderActions(handlers: VerdictHandlers, extra: readonly HTMLElement[]): HTMLElement {
   const inspect = el('button', {
     className: 'button-secondary',
     text: 'Inspect evidence',
     attrs: { type: 'button', 'data-suspect-rank': '1' },
   });
   inspect.addEventListener('click', () => handlers.onInspect(1, inspect));
-  return el('div', { className: 'verdict-actions' }, [inspect]);
+  return el('div', { className: 'verdict-actions' }, [inspect, ...extra]);
 }
 
-export function renderVerdict(view: VerdictView, handlers: VerdictHandlers): HTMLElement {
+/** `extraActions` follow 'Inspect evidence' in the actions row (the copy control). */
+export function renderVerdict(view: VerdictView, handlers: VerdictHandlers, extraActions: readonly HTMLElement[] = []): HTMLElement {
   const headingId = 'verdict-title';
   const main: HTMLElement[] = [el('p', { className: 'verdict-interpretation', text: view.interpretation }), renderHeadline(view)];
   const preview = renderEvidencePreview(view.evidencePreview, handlers);
@@ -142,7 +143,7 @@ export function renderVerdict(view: VerdictView, handlers: VerdictHandlers): HTM
       el('div', { className: 'verdict-main' }, main),
       el('div', { className: 'verdict-side' }, [renderFacts(view), renderScoreRow(view)]),
     ]),
-    renderActions(handlers),
+    renderActions(handlers, extraActions),
     el('p', { className: 'verdict-caveat', text: view.caveat }),
   );
   return el('section', { className: 'verdict', attrs: { 'aria-labelledby': headingId } }, children);
