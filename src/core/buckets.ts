@@ -1,5 +1,7 @@
 import type { ErrorGroup, LogEvent, UtcBucket } from './model';
 
+export type { UtcBucket } from './model';
+
 export const DEFAULT_BUCKET_MINUTES = 5;
 
 /** A typed failure for an invalid deterministic analysis option. */
