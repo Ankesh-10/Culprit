@@ -7,6 +7,8 @@ import {
   LOG_PAGE_SIZE,
   buildLogPanelView,
   buildReadout,
+  buildSeries,
+  buildSignatureRows,
   buildTableTwinRows,
   defaultBucketIndex,
   initialInvestigation,
@@ -46,7 +48,8 @@ describe('default and peak selection', () => {
 
   it('starts with the log panel closed and one page of rows', () => {
     const initial = initialInvestigation(CHECKOUT);
-    expect(initial.logPanel).toEqual({ open: false, visible: LOG_PAGE_SIZE });
+    expect(initial.logPanel).toEqual({ open: false, visible: LOG_PAGE_SIZE, scope: 'bucket' });
+    expect(initial.filter).toBeNull();
     expect(initial.tableVisible).toBe(LOG_PAGE_SIZE);
   });
 });
@@ -134,7 +137,7 @@ describe('reduceInvestigation', () => {
     state = reduceInvestigation(state, { type: 'show-more-log-lines' }, context);
     expect(state.logPanel.visible).toBe(LOG_PAGE_SIZE * 2);
     state = reduceInvestigation(state, { type: 'select', index: 4 }, context);
-    expect(state.logPanel).toEqual({ open: true, visible: LOG_PAGE_SIZE });
+    expect(state.logPanel).toEqual({ open: true, visible: LOG_PAGE_SIZE, scope: 'bucket' });
     state = reduceInvestigation(state, { type: 'close-log-lines' }, context);
     expect(state.logPanel.open).toBe(false);
     expect(reduceInvestigation(state, { type: 'show-more-table-rows' }, context).tableVisible).toBe(LOG_PAGE_SIZE * 2);
@@ -218,5 +221,87 @@ describe('buildTableTwinRows', () => {
     expect(partial.total).toBe(8);
     expect(partial.hasMore).toBe(true);
     expect(buildTableTwinRows(SLOW_BURN, { ...initialInvestigation(SLOW_BURN), tableVisible: 8 }).hasMore).toBe(false);
+  });
+});
+
+function signatureLike(stream: AnalysisStream, word: string): string {
+  const found = stream.errors.find((group) => group.signature.includes(word));
+  if (found === undefined) throw new Error(`no signature with ${word}`);
+  return found.signature;
+}
+
+const CAMERAS = signatureLike(AMBIGUOUS, 'cameras');
+const NOTEBOOKS = signatureLike(AMBIGUOUS, 'notebooks');
+const TABLETS = signatureLike(AMBIGUOUS, 'tablets');
+const CHECKOUT_SIGNATURE = CHECKOUT.errors[0]?.signature ?? '';
+
+function filtered(stream: AnalysisStream, signature: string | null, index: number): InvestigationState {
+  return { ...at(stream, index), filter: signature };
+}
+
+describe('buildSignatureRows', () => {
+  it('orders signatures by events, first seen, then signature', () => {
+    const view = buildSignatureRows(AMBIGUOUS, initialInvestigation(AMBIGUOUS));
+    expect(view.emptyText).toBeNull();
+    expect(view.rows.map((row) => [row.signature, row.count, row.firstSeen])).toEqual([
+      [CAMERAS, 2, '10:06:00'],
+      [NOTEBOOKS, 1, '10:05:00'],
+      [TABLETS, 1, '10:24:00'],
+    ]);
+    const first = view.rows[0];
+    expect(first?.firstSeenTitle).toBe('2026-10-19 10:06:00 UTC');
+    expect(first?.representativeMessage.length).toBeGreaterThan(0);
+    expect(view.rows.every((row) => !row.pressed && row.actionLabel === 'Filter timeline')).toBe(true);
+  });
+
+  it('marks only the filtered row as pressed with the clearing label', () => {
+    const view = buildSignatureRows(AMBIGUOUS, filtered(AMBIGUOUS, CAMERAS, 1));
+    expect(view.rows.map((row) => row.pressed)).toEqual([true, false, false]);
+    expect(view.rows[0]?.actionLabel).toBe('Filtering — clear');
+    expect(view.rows[1]?.actionLabel).toBe('Filter timeline');
+  });
+});
+
+describe('buildSeries', () => {
+  it('returns totals and no filtered series when unfiltered', () => {
+    expect(buildSeries(CHECKOUT, null)).toEqual({ totals: [2, 0, 3], filtered: null, yMax: 3 });
+  });
+
+  it('returns the filtered series with the axis maximum from the totals', () => {
+    expect(buildSeries(CHECKOUT, CHECKOUT_SIGNATURE)).toEqual({ totals: [2, 0, 3], filtered: [2, 0, 3], yMax: 3 });
+    expect(buildSeries(AMBIGUOUS, CAMERAS).filtered).toEqual([0, 1, 0, 1, 0]);
+    expect(buildSeries(AMBIGUOUS, CAMERAS).yMax).toBe(buildSeries(AMBIGUOUS, null).yMax);
+  });
+
+  it('does not rescale for a signature absent from the log', () => {
+    expect(buildSeries(CHECKOUT, 'not in this log')).toEqual({ totals: [2, 0, 3], filtered: [0, 0, 0], yMax: 3 });
+  });
+});
+
+describe('signature filter', () => {
+  it('reads the filtered count against the interval total in the readout', () => {
+    const readout = buildReadout(AMBIGUOUS, filtered(AMBIGUOUS, CAMERAS, 1));
+    expect(readout.text).toBe('10:05–10:10 UTC · 1 of 2 errors · 2 signatures · Inside onset window');
+    expect(readout.logButtonLabel).toBe('Show log lines (1)');
+  });
+
+  it('shows the interval events of the signature in bucket scope and all of them in signature scope', () => {
+    const bucketScope = filtered(AMBIGUOUS, CAMERAS, 1);
+    expect(selectLogLines(AMBIGUOUS, bucketScope)).toHaveLength(1);
+    const signatureScope: InvestigationState = { ...bucketScope, logPanel: { open: true, visible: LOG_PAGE_SIZE, scope: 'signature' } };
+    const events = selectLogLines(AMBIGUOUS, signatureScope);
+    expect(events).toHaveLength(2);
+    const stamps = events.map((event) => event.timestampUtc);
+    expect([...stamps].sort()).toEqual(stamps);
+  });
+
+  it('opens a signature-scope panel after set-filter then open-log-lines', () => {
+    const context = investigationContext(AMBIGUOUS);
+    let state = initialInvestigation(AMBIGUOUS);
+    state = reduceInvestigation(state, { type: 'set-filter', signature: CAMERAS }, context);
+    state = reduceInvestigation(state, { type: 'open-log-lines', scope: 'signature' }, context);
+    expect(state.filter).toBe(CAMERAS);
+    expect(state.logPanel).toEqual({ open: true, visible: LOG_PAGE_SIZE, scope: 'signature' });
+    expect(selectLogLines(AMBIGUOUS, state)).toHaveLength(2);
   });
 });

@@ -1,7 +1,7 @@
 import type { AnalysisStream } from '../core/model';
 import { clear, el, svgEl } from './dom';
 import { formatCompactCount } from './format';
-import { buildReadout, buildTableTwinRows, investigationContext } from './investigation-model';
+import { buildReadout, buildSeries, buildTableTwinRows, investigationContext } from './investigation-model';
 import type { InvestigationEvent, InvestigationState } from './investigation-model';
 import {
   bucketCenters,
@@ -46,6 +46,7 @@ const SEPARATOR = ' · ';
 
 export const SLIDER_FOCUS_ID = 'slider';
 export const READOUT_FOCUS_ID = 'readout-log';
+export const CLEAR_FILTER_FOCUS_ID = 'clear-filter';
 
 function viewportWidth(fallback: number): number {
   return typeof window === 'undefined' ? fallback : window.innerWidth;
@@ -76,11 +77,13 @@ function diamondPoints(cx: number, cy: number, size: number): string {
   return `${cx},${cy - half} ${cx + half},${cy} ${cx},${cy + half} ${cx - half},${cy}`;
 }
 
-function legendKey(kind: 'line' | 'band' | 'leading' | 'other'): SVGElement {
+function legendKey(kind: 'line' | 'context' | 'band' | 'leading' | 'other'): SVGElement {
   const attrs = { class: 'legend-key', width: '24', height: '16', viewBox: '0 0 24 16', 'aria-hidden': 'true', focusable: 'false' };
   switch (kind) {
     case 'line':
       return svgEl('svg', attrs, [svgEl('line', { class: 'series-line', x1: '1', x2: '23', y1: '8', y2: '8' })]);
+    case 'context':
+      return svgEl('svg', attrs, [svgEl('line', { class: 'series-line context-line', x1: '1', x2: '23', y1: '8', y2: '8' })]);
     case 'band':
       return svgEl('svg', attrs, [
         svgEl('rect', { class: 'onset-band', x: '1', y: '1', width: '22', height: '14' }),
@@ -93,18 +96,18 @@ function legendKey(kind: 'line' | 'band' | 'leading' | 'other'): SVGElement {
   }
 }
 
-function renderLegend(): HTMLElement {
-  const entries: Array<['line' | 'band' | 'leading' | 'other', string]> = [
-    ['line', 'Errors per interval'],
-    ['band', 'Onset window'],
-    ['leading', 'Leading suspect'],
-    ['other', 'Other commits'],
-  ];
-  return el(
-    'ul',
-    { className: 'chart-legend' },
-    entries.map(([kind, text]) => el('li', {}, [legendKey(kind), el('span', { text })])),
-  );
+/** The emphasis form names the filtered series in text beside a gray key for the unfiltered total. */
+function fillLegend(legend: HTMLElement, filter: string | null): void {
+  const entries: Array<['line' | 'context' | 'band' | 'leading' | 'other', string]> =
+    filter === null
+      ? [['line', 'Errors per interval']]
+      : [
+          ['context', 'All errors'],
+          ['line', `Filtered: ${filter}`],
+        ];
+  entries.push(['band', 'Onset window'], ['leading', 'Leading suspect'], ['other', 'Other commits']);
+  clear(legend);
+  for (const [kind, text] of entries) legend.append(el('li', {}, [legendKey(kind), el('span', { text })]));
 }
 
 interface ChartLayout {
@@ -136,8 +139,10 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   }
 
   const context = investigationContext(stream);
-  const values = stream.timeline.map((point) => point.errorCount);
-  const yMax = values.reduce((max, value) => Math.max(max, value), 1);
+  // The y-axis maximum always comes from the unfiltered totals, so a filter never rescales the chart.
+  const baseSeries = buildSeries(stream, null);
+  const values = baseSeries.totals;
+  const yMax = baseSeries.yMax;
   const peakValue = values[context.peakIndex] ?? 0;
 
   let state = initial;
@@ -158,13 +163,15 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     attrs: { type: 'button', 'data-focus-id': 'jump-peak' },
     on: { click: () => handlers.onEvent({ type: 'jump', target: 'peak' }, null) },
   });
+  const filterSlot = el('div', { className: 'filter-slot' });
   const header = el('div', { className: 'timeline-header' }, [
     heading,
+    filterSlot,
     el('div', { className: 'timeline-toolbar' }, [jumpOnset, jumpPeak]),
   ]);
 
   const title = el('p', { className: 'chart-title', text: `Errors per ${minutes}-minute interval (UTC)` });
-  const legend = renderLegend();
+  const legend = el('ul', { className: 'chart-legend' });
   const chartHost = el('div', { className: 'chart-host' });
   const slider = el('div', {
     className: 'timeline-slider',
@@ -227,6 +234,23 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     twinMore,
   ]);
 
+  /** The filter chip with its Clear filter button, and the legend that names the filtered series. */
+  function syncFilter(): void {
+    clear(filterSlot);
+    if (state.filter !== null) {
+      filterSlot.append(
+        el('span', { className: 'chip filter-chip', text: `Filtered: ${state.filter}` }),
+        el('button', {
+          className: 'button-secondary',
+          text: 'Clear filter',
+          attrs: { type: 'button', 'data-focus-id': CLEAR_FILTER_FOCUS_ID },
+          on: { click: () => handlers.onEvent({ type: 'set-filter', signature: null }, CLEAR_FILTER_FOCUS_ID) },
+        }),
+      );
+    }
+    fillLegend(legend, state.filter);
+  }
+
   function renderTwinRows(): void {
     const view = buildTableTwinRows(stream, state);
     clear(twinBody);
@@ -279,7 +303,10 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     const scale = createXScale(domain, plotWidth);
     const centers = bucketCenters(stream.timeline);
     const xs = centers.map((center) => scale.toX(center));
-    const ys = values.map((value) => yForValue(value, yMax, plotHeight));
+    const series = buildSeries(stream, state.filter);
+    const totalYs = values.map((value) => yForValue(value, yMax, plotHeight));
+    // The selection ring follows the emphasised series.
+    const ys = (series.filtered ?? values).map((value) => yForValue(value, yMax, plotHeight));
     const geometry = buildPlotGeometry(stream.timeline, values, domain, plotWidth, plotHeight, yMax);
 
     const plot = svgEl('g', { transform: `translate(${PAD_LEFT} ${PAD_TOP})` });
@@ -319,17 +346,27 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     }
 
     // Series.
-    plot.append(
-      svgEl('path', { class: 'series-area', d: geometry.areaPath }),
-      svgEl('path', { class: 'series-line', d: geometry.linePath }),
-    );
+    if (series.filtered === null) {
+      plot.append(
+        svgEl('path', { class: 'series-area', d: geometry.areaPath }),
+        svgEl('path', { class: 'series-line', d: geometry.linePath }),
+      );
+    } else {
+      // Emphasis form: the total in context gray without a wash, the selected signature in the series blue with it.
+      const emphasised = buildPlotGeometry(stream.timeline, series.filtered, domain, plotWidth, plotHeight, yMax);
+      plot.append(
+        svgEl('path', { class: 'series-line context-line', d: geometry.linePath }),
+        svgEl('path', { class: 'series-area', d: emphasised.areaPath }),
+        svgEl('path', { class: 'series-line', d: emphasised.linePath }),
+      );
+    }
 
     // Peak dot and label.
     if (peakValue > 0) {
       const px = xs[context.peakIndex];
-      const py = ys[context.peakIndex];
+      const py = totalYs[context.peakIndex];
       if (px !== undefined && py !== undefined) {
-        plot.append(svgEl('circle', { class: 'peak-dot', cx: String(px), cy: String(py), r: '4' }));
+        plot.append(svgEl('circle', { class: series.filtered === null ? 'peak-dot' : 'peak-dot is-context', cx: String(px), cy: String(py), r: '4' }));
         const text = `Peak ${peakValue}`;
         const labelWidth = estimateLabelWidth(text);
         labelCandidates.push({ id: 'peak', priority: 3, x: px - labelWidth / 2, y: py - 8 - LABEL_HEIGHT, width: labelWidth, height: LABEL_HEIGHT });
@@ -523,6 +560,7 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   if (noteLine !== null) section.append(noteLine);
   section.append(readoutBar, twin);
 
+  syncFilter();
   syncReadout();
   renderTwinRows();
   draw();
@@ -542,8 +580,17 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   return {
     element: section,
     update(next) {
+      const filterChanged = next.filter !== state.filter;
       state = next;
       syncReadout();
+      if (filterChanged) {
+        // The chart, legend, chip and table twin all re-render against the same filter.
+        hideTooltip();
+        syncFilter();
+        draw();
+        renderTwinRows();
+        return;
+      }
       moveSelection();
       if (state.tableVisible !== renderedTableVisible) renderTwinRows();
       else markSelectedRow();

@@ -1110,6 +1110,99 @@ a { color: var(--color-ink); text-decoration: underline; }
 
 .level-chip { align-self: auto; font-family: var(--font-mono); }
 
+/* Signature filter: emphasis form, chip and signatures table */
+
+.series-line.context-line { stroke: var(--viz-context); }
+
+.peak-dot.is-context { fill: var(--viz-context); }
+
+.filter-slot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.filter-slot:empty { display: none; }
+
+.filter-chip {
+  min-width: 0;
+  max-width: 100%;
+  font-family: var(--font-mono);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+.signatures-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.signatures-table th,
+.signatures-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.signatures-table thead th {
+  color: var(--color-ink-2);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+}
+
+.signatures-table .col-number { font-variant-numeric: tabular-nums; text-align: right; }
+.signatures-table .col-mono { font-family: var(--font-mono); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.signatures-table .signature-cell {
+  min-width: 220px;
+  font-weight: var(--weight-regular);
+  color: var(--color-ink);
+}
+
+.signature-name {
+  display: block;
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.signature-message {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--color-ink-2);
+  overflow-wrap: anywhere;
+}
+
+.signatures-empty { color: var(--color-ink-2); }
+
+.signature-toggle { display: inline-flex; align-items: center; gap: var(--space-xs); white-space: nowrap; }
+
+.toggle-icon { display: inline-flex; }
+.toggle-icon:empty { display: none; }
+.toggle-check { color: var(--color-accent); }
+
+.signatures-table tr.is-pressed th:first-child { box-shadow: inset 4px 0 0 var(--color-accent); }
+.signatures-table tr.is-pressed td { background: var(--color-raised); }
+.signatures-table tr.is-pressed th { background: var(--color-raised); }
+
+@media (max-width: 639px) {
+  .signatures-table th:first-child,
+  .signatures-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--color-surface);
+  }
+
+  .signatures-table tr.is-pressed th:first-child { background: var(--color-raised); }
+}
+
 /* Forced colors keep outlines, rules and icons visible. */
 
 @media (forced-colors: active) {
@@ -1132,6 +1225,8 @@ a { color: var(--color-ink); text-decoration: underline; }
   .considered { border: 1px solid CanvasText; }
 
   .series-line { stroke: CanvasText; }
+  .series-line.context-line { stroke: GrayText; stroke-dasharray: 6 4; }
+  .peak-dot.is-context { fill: GrayText; }
   .series-area { fill: CanvasText; fill-opacity: 0.1; }
   .onset-band { fill: Highlight; fill-opacity: 0.3; }
   .onset-bracket { stroke: Highlight; }
@@ -1157,6 +1252,7 @@ a { color: var(--color-ink); text-decoration: underline; }
   .chart-tooltip,
   .table-twin { border: 1px solid CanvasText; }
   .twin-table tr.is-selected td:first-child { box-shadow: inset 4px 0 0 Highlight; }
+  .signatures-table tr.is-pressed th:first-child { box-shadow: inset 4px 0 0 Highlight; }
   .timeline-slider:focus-visible { outline: 2px solid Highlight; }
 
   .meter-segment.is-filled,

@@ -41,6 +41,12 @@ export function formatUtcSeconds(iso: string): string {
   return parts === null ? iso : `${parts.hours}:${parts.minutes}:${parts.seconds}`;
 }
 
+/** `2026-10-19 04:20:30 UTC`; non-ISO input is returned unchanged. */
+export function formatUtcDateSeconds(iso: string): string {
+  const parts = parseUtc(iso);
+  return parts === null ? iso : `${parts.date} ${parts.hours}:${parts.minutes}:${parts.seconds} UTC`;
+}
+
 /** `04:30–04:35 UTC`; when either end is not ISO both inputs are returned unchanged. */
 export function formatUtcInterval(startIso: string, endIso: string): string {
   const start = parseUtc(startIso);

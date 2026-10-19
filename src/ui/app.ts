@@ -7,11 +7,19 @@ import { registerLocalFonts } from './fonts';
 import { initialPageState, reducePage, scheduleLoadingBanner } from './state';
 import type { PageEvent, PageState, Scheduler, SettledState } from './state';
 import { renderEmptyState, renderErrorState, renderLoadingPlaceholder, renderStatePanel, renderStatus } from './status';
-import { buildLogPanelView, initialInvestigation, investigationContext, reduceInvestigation } from './investigation-model';
+import {
+  buildLogPanelView,
+  buildSignatureRows,
+  initialInvestigation,
+  investigationContext,
+  reduceInvestigation,
+} from './investigation-model';
 import type { InvestigationEvent, InvestigationState } from './investigation-model';
 import { renderLogLines } from './log-lines';
 import type { LogLinesPanel } from './log-lines';
 import { renderConsidered, renderShortlist } from './shortlist';
+import { renderSignatures } from './signatures';
+import type { SignaturesPanel } from './signatures';
 import { SLIDER_FOCUS_ID, renderTimeline } from './timeline';
 import type { TimelineView } from './timeline';
 import { renderVerdict } from './verdict';
@@ -57,6 +65,7 @@ export function mountApp(doc: Document): void {
   let investigation: InvestigationState | null = null;
   let activeStream: AnalysisStream | null = null;
   let timelineView: TimelineView | null = null;
+  let signaturesView: SignaturesPanel | null = null;
   let logSlot: HTMLElement | null = null;
   let logPanel: LogLinesPanel | null = null;
   let logOpenerId: string | null = null;
@@ -64,6 +73,7 @@ export function mountApp(doc: Document): void {
   function disposeInvestigation(): void {
     timelineView?.dispose();
     timelineView = null;
+    signaturesView = null;
     logSlot = null;
     logPanel = null;
   }
@@ -80,6 +90,13 @@ export function mountApp(doc: Document): void {
     logSlot.append(logPanel.element);
   }
 
+  /** Focus a control from the timeline or the signatures table; the slider is the fallback. */
+  function focusControl(id: string): void {
+    if (timelineView?.focusById(id) === true) return;
+    if (signaturesView?.focusById(id) === true) return;
+    timelineView?.focusById(SLIDER_FOCUS_ID);
+  }
+
   function dispatchInvestigation(event: InvestigationEvent, openerId: string | null): void {
     if (investigation === null || activeStream === null || timelineView === null) return;
     const previous = investigation;
@@ -90,9 +107,11 @@ export function mountApp(doc: Document): void {
     }
     investigation = next;
     timelineView.update(next);
+    signaturesView?.update(buildSignatureRows(activeStream, next));
     if (next.logPanel.open) {
       renderLogPanel();
-      if (!previous.logPanel.open) {
+      const scopeChanged = event.type === 'open-log-lines' && previous.logPanel.scope !== next.logPanel.scope;
+      if (!previous.logPanel.open || scopeChanged) {
         logOpenerId = openerId;
         logPanel?.heading.focus();
       } else if (event.type === 'show-more-log-lines') {
@@ -100,10 +119,11 @@ export function mountApp(doc: Document): void {
       }
     } else if (previous.logPanel.open) {
       renderLogPanel();
-      const opener = logOpenerId ?? SLIDER_FOCUS_ID;
-      if (!timelineView.focusById(opener)) timelineView.focusById(SLIDER_FOCUS_ID);
+      focusControl(logOpenerId ?? SLIDER_FOCUS_ID);
       logOpenerId = null;
     }
+    // A control that removed itself (Clear filter) must not strand focus on the page body.
+    if (event.type === 'set-filter' && (doc.activeElement === null || doc.activeElement === doc.body)) focusControl(SLIDER_FOCUS_ID);
   }
 
   /** The timeline and its log panel slot; selection state is reset whenever a different result arrives. */
@@ -115,9 +135,10 @@ export function mountApp(doc: Document): void {
       logOpenerId = null;
     }
     timelineView = renderTimeline(stream, investigation, { onEvent: dispatchInvestigation });
+    signaturesView = renderSignatures(buildSignatureRows(stream, investigation), { onEvent: dispatchInvestigation });
     logSlot = el('div', { className: 'log-slot' });
     renderLogPanel();
-    return el('div', { className: 'investigation' }, [timelineView.element, logSlot]);
+    return el('div', { className: 'investigation' }, [timelineView.element, logSlot, signaturesView.element]);
   }
 
   function renderSettled(settled: SettledState): HTMLElement {
