@@ -53,7 +53,9 @@ export function clear(node: Node): void {
   while (node.firstChild !== null) node.removeChild(node.firstChild);
 }
 
-export function icon(name: string): SVGElement {
+export function icon(name: string, className?: string): SVGElement {
   const use = svgEl('use', { href: `#icon-${name}` });
-  return svgEl('svg', { 'aria-hidden': 'true', focusable: 'false', width: '16', height: '16' }, [use]);
+  const attrs: Record<string, string> = { 'aria-hidden': 'true', focusable: 'false', width: '16', height: '16' };
+  if (className !== undefined) attrs['class'] = className;
+  return svgEl('svg', attrs, [use]);
 }

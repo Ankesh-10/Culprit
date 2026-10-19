@@ -22,7 +22,10 @@
         <h2 id="input-title">Load an incident</h2>
         <div id="case-picker" class="case-picker"></div>
       </section>
-      <div id="status" role="status" aria-live="polite"></div>
+      <div id="status-region" class="status-region">
+        <div class="status-banner" hidden></div>
+        <p id="status" class="status-announcer visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+      </div>
       <section id="result" class="panel" aria-labelledby="result-title">
         <h2 id="result-title" tabindex="-1" hidden></h2>
         <div id="result-body"></div>
