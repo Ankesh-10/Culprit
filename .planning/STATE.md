@@ -1,14 +1,14 @@
 ---
 gsd_state_version: "1.0"
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-10-19T17:29:09.455Z"
-state_head: 86c051e51842090477cc87088cbcb721d46843f5
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-10-19T17:38:02.820Z"
+state_head: d5041cf874baef97c17e20fa8e7e75d3e66965bc
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 12
+  completed_plans: 13
   percent: 60
 current_phase: 4
 current_phase_name: Incident Console and Investigation Flow
@@ -28,9 +28,11 @@ current_phase_name: Incident Console and Investigation Flow
 
 ## Current Position
 
-- **Phase:** Phase 4 (Incident Console and Investigation Flow) in progress; plans 04-01 and 04-02 complete, 04-03 next.
-- **Progress:** 3/5 phases complete; Phase 4 plans 2/8 complete.
-- **Last action:** Completed 04-02: page state machine, status/announcer renderers, sparkline case cards and switcher, token stylesheet, local font loader with system fallback.
+- **Phase:** Phase 4 (Incident Console and Investigation Flow) in progress.
+- **Current Plan:** 6
+- **Total Plans in Phase:** 8
+- **Progress:** 3/5 phases complete; Phase 4 plans 5/8 complete (04-06 next).
+- **Last action:** Completed 04-05: error signatures table with aria-pressed filter toggles; the signature filter drives the emphasis chart, readout, log lines (signature and interval scope), filter chip with Clear filter and the filtered data table.
 
 ## Decisions
 
@@ -49,6 +51,8 @@ current_phase_name: Incident Console and Investigation Flow
 - [Phase 04]: 04-04: PageUp is step -12 and PageDown +12 on the timeline slider, following the plan literally (reverse of the ARIA slider convention)
 - [Phase 04]: 04-04: Timeline is built once per result and updated in place via view.update(state); ResizeObserver redraws only the SVG so slider focus and the table disclosure survive
 - [Phase 04]: 04-04: Viewport width drives tick count, plot height and #2/#3 label dropping; container width drives SVG width; tooltip text is the readout string split on the separator
+- [Phase 04]: 04-05: a selection change returns an open signature-scope log panel to bucket scope; a signature-scope open without a filter falls back to bucket scope
+- [Phase 04]: 04-05: signature filter keeps the y-axis max from unfiltered totals; emphasis form is gray total plus blue filtered line; signatureCounts lookups use Object.hasOwn
 
 ## Blockers
 
@@ -67,8 +71,8 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 
 ## Session Continuity
 
-**Last session:** 2026-10-19T17:29:09.229Z
-**Stopped at:** Completed 04-04-PLAN.md
+**Last session:** 2026-10-19T17:38:02.594Z
+**Stopped at:** Completed 04-05-PLAN.md
 **Resume file:** None
 
 - **Last session:** 2026-10-19 — Phase 2 implementation and verification completed.
@@ -89,3 +93,4 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 | Phase 04 P02 | 10 min | 2 tasks | 14 files |
 | Phase 04 P03 | 6 min | 2 tasks | 8 files |
 | Phase 04 P04 | 14 min | 2 tasks | 9 files |
+| Phase 04 P05 | 5 min | 2 tasks | 7 files |
