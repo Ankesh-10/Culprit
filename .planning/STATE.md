@@ -2,16 +2,16 @@
 gsd_state_version: "1.0"
 status: unknown
 stopped_at: Phase 1 complete, ready to plan Phase 2
-last_updated: "2026-10-19T08:00:41.862Z"
-state_head: c771bd77a89305d5ef42ee8fd8cc67ddc75795a3
+last_updated: "2026-10-19T12:33:40.436Z"
+state_head: c9931d01ed74365bd7b37c6dd50d4064c4b19e5a
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 2
+  total_plans: 8
   completed_plans: 2
-  percent: 20
+  percent: 40
+current_phase_name: Evidence, Ranking, and Trust Model
 current_phase: 2
-current_phase_name: Deterministic Analysis Core
 ---
 
 # Culprit State
