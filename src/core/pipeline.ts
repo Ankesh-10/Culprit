@@ -216,7 +216,10 @@ export function analyze(input: AnalysisInput): AnalysisOutcome {
   const historyResult = parseHistoryExport(input.history.text, { source: checked.historySource });
   const failure = analysisFailure(logResult, historyResult);
   if (failure !== null) return failure;
-  if (!logResult.ok || !historyResult.ok) throw new Error('Parser outcome narrowed unexpectedly.');
+  if (!logResult.ok || !historyResult.ok) {
+    const diagnostic = optionDiagnostic('INVALID_ANALYSIS_INPUT', 'Parser dispatch did not produce a complete outcome.');
+    return invalidOutcome(new AnalysisInputError(diagnostic.message), diagnostic);
+  }
 
   const normalizedEvents = logResult.value.events;
   const commits = historyResult.value.commits;
