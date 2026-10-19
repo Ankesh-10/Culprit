@@ -81,9 +81,12 @@ export function plural(count: number, singular: string, pluralForm: string = `${
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
-/** Stub (RED): replaced by the grouped implementation. */
+/** `10,000`: digits grouped by three with commas through string slicing, never a locale API. */
 export function formatInteger(n: number): string {
-  return String(n);
+  const digits = String(Math.abs(Math.trunc(n)));
+  const groups: string[] = [];
+  for (let end = digits.length; end > 0; end -= 3) groups.unshift(digits.slice(Math.max(0, end - 3), end));
+  return `${n < 0 ? '-' : ''}${groups.join(',')}`;
 }
 
 export function formatMiB(bytes: number): string {

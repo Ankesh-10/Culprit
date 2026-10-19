@@ -1282,6 +1282,120 @@ a { color: var(--color-ink); text-decoration: underline; }
   .verdict-actions .copy-button { width: 100%; justify-content: center; }
 }
 
+/* Trust footer: warnings, diagnostics and the assumptions disclosure stay beside the result. */
+
+.truncation-banner .caution-lead { margin-bottom: 0; }
+
+.trust-footer {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.trust-footer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.trust-footer-head h2 { margin: 0; }
+
+.trust-list {
+  display: grid;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  list-style: none;
+}
+
+.trust-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-sm);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.trust-item-icon {
+  align-self: flex-start;
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-warning);
+}
+
+.trust-code,
+.trust-line {
+  color: var(--color-ink-2);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.trust-message {
+  flex: 1 1 24ch;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.trust-none {
+  margin: 0 0 var(--space-md);
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.trust-details {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-sm);
+}
+
+.trust-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: var(--weight-semibold);
+}
+
+.trust-summary-note {
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-regular);
+}
+
+.trust-details-body {
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0 var(--space-xs);
+}
+
+.trust-detail-label {
+  margin: 0 0 var(--space-xs);
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-label);
+}
+
+.trust-detail p,
+.trust-bullets {
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  overflow-wrap: anywhere;
+}
+
+.trust-bullets { padding-left: var(--space-lg); }
+.trust-bullets li + li { margin-top: var(--space-xs); }
+
+.trust-detail .is-mono { font-family: var(--font-mono); }
+
 /* Suspect drawer: a native modal dialog anchored right, full screen on phones, no animation. */
 
 .suspect-drawer {

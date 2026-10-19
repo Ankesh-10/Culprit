@@ -10,6 +10,8 @@ import type {
 import { toAnalysisResult } from '../core/pipeline';
 import {
   formatGapShort,
+  formatInteger,
+  formatMiB,
   formatPathRange,
   formatScore,
   formatTimeGap,
@@ -377,19 +379,44 @@ export interface TrustFooterView {
   truncationBanner: string | null;
 }
 
-/** Stub (RED): replaced by the real footer view. */
-export function buildTrustFooterView(_stream: AnalysisStream): TrustFooterView {
+export const TRUST_FOOTER_HEADING = 'Warnings and caveats';
+export const ASSUMPTIONS_SUMMARY = 'UTC · local · not proof';
+export const UTC_NOTE = 'All timestamps are normalized to UTC and shown without local conversion.';
+export const TRUNCATION_BANNER = 'Input was truncated at the limit; results use only the lines that were read.';
+
+const MIB = 1048576;
+
+function formatLimitBytes(bytes: number): string {
+  return bytes % MIB === 0 ? `${bytes / MIB} MiB` : formatMiB(bytes);
+}
+
+/** Warnings first, then diagnostics; the count chip counts both. Every caveat is data from the stream. */
+export function buildTrustFooterView(stream: AnalysisStream): TrustFooterView {
+  const items: TrustFooterItem[] = [
+    ...stream.warnings.map((message): TrustFooterItem => ({ code: null, line: null, message })),
+    ...stream.diagnostics.map(
+      (diagnostic): TrustFooterItem => ({
+        code: `${diagnostic.source}/${diagnostic.code}`,
+        line: diagnostic.line === null ? null : `line ${diagnostic.line}`,
+        message: diagnostic.message,
+      }),
+    ),
+  ];
+  const { limits, provenance } = stream;
   return {
-    heading: '',
-    countChip: null,
-    items: [],
-    assumptionsSummary: '',
-    rationale: '',
-    assumptions: [],
-    versions: '',
-    provenance: [],
-    limits: '',
-    utcNote: '',
-    truncationBanner: null,
+    heading: TRUST_FOOTER_HEADING,
+    countChip: items.length === 0 ? null : plural(items.length, 'warning'),
+    items,
+    assumptionsSummary: ASSUMPTIONS_SUMMARY,
+    rationale: stream.ranking.confidence.rationale,
+    assumptions: [...stream.assumptions],
+    versions: `${stream.analysisVersion} · ${stream.scoringVersion} · schema ${stream.schemaVersion}`,
+    provenance: [
+      `Logs: ${provenance.logSource} (${provenance.logFormat}, ${plural(provenance.eventCount, 'event')})`,
+      `History: ${provenance.historySource} (${provenance.historyFormat}, ${plural(provenance.commitCount, 'commit')})`,
+    ],
+    limits: `Limits: ${formatLimitBytes(limits.maxLogBytes)} of log text, ${formatInteger(limits.maxEvents)} events, ${formatInteger(limits.maxStackLines)} stack lines per event`,
+    utcNote: UTC_NOTE,
+    truncationBanner: limits.truncated ? TRUNCATION_BANNER : null,
   };
 }

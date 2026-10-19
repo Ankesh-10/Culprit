@@ -27,12 +27,14 @@ import { renderSignatures } from './signatures';
 import type { SignaturesPanel } from './signatures';
 import { SLIDER_FOCUS_ID, renderTimeline } from './timeline';
 import type { TimelineView } from './timeline';
+import { renderTruncationBanner, renderTrustFooter } from './trust-footer';
 import { renderVerdict } from './verdict';
 import {
   buildConsideredRows,
   buildShortlistView,
   buildStatePanel,
   buildStatusView,
+  buildTrustFooterView,
   buildVerdictView,
   deriveResultKind,
 } from './view-model';
@@ -204,6 +206,14 @@ export function mountApp(doc: Document): void {
     return el('div', { className: 'investigation' }, [timelineView.element, logSlot, signaturesView.element]);
   }
 
+  /** Every done result ends with the trust footer; a truncated input also gets a banner at the very top. */
+  function composeResult(stream: AnalysisStream, parts: HTMLElement[]): HTMLElement {
+    const footer = buildTrustFooterView(stream);
+    if (footer.truncationBanner !== null) parts.unshift(renderTruncationBanner(footer.truncationBanner));
+    parts.push(renderTrustFooter(footer));
+    return el('div', { className: 'result-stack' }, parts);
+  }
+
   function renderSettled(settled: SettledState): HTMLElement {
     disposeInvestigation();
     if (settled.phase === 'error') return renderErrorState(settled.failure);
@@ -213,16 +223,16 @@ export function mountApp(doc: Document): void {
       const parts: HTMLElement[] = [renderStatePanel(panel), el('div', { className: 'copy-under-panel' }, [createCopyControl().element])];
       if (deriveResultKind(stream) === 'no-eligible-commits') parts.push(renderConsidered(buildConsideredRows(stream)));
       parts.push(mountInvestigation(stream));
-      return el('div', { className: 'result-stack' }, parts);
+      return composeResult(stream, parts);
     }
     const view = buildVerdictView(stream);
-    if (view === null) return el('p', { text: stream.ranking.interpretation });
+    if (view === null) return composeResult(stream, [el('p', { text: stream.ranking.interpretation })]);
     const parts: HTMLElement[] = [renderVerdict(view, { onInspect: inspectSuspect }, [createCopyControl().element])];
     const shortlist = buildShortlistView(stream);
     if (shortlist !== null) parts.push(renderShortlist(shortlist, { onInspect: inspectSuspect }));
     parts.push(renderConsidered(buildConsideredRows(stream)));
     parts.push(mountInvestigation(stream));
-    return el('div', { className: 'result-stack' }, parts);
+    return composeResult(stream, parts);
   }
 
   function renderPicker(): void {
