@@ -1,0 +1,147 @@
+/** The public result boundary is intentionally JSON-serializable and versioned. */
+export const SCHEMA_VERSION = 1 as const;
+export const ANALYSIS_VERSION = 'analysis-v1' as const;
+export const SCORING_VERSION = 'scoring-v1' as const;
+
+export type SchemaVersion = typeof SCHEMA_VERSION;
+export type AnalysisVersion = typeof ANALYSIS_VERSION;
+export type ScoringVersion = typeof SCORING_VERSION;
+export type TimestampUtc = string;
+
+export type LogFormat = 'jsonl' | 'plain-text';
+export type HistoryFormat = 'culprit-json' | 'git-log';
+export type OnsetClass = 'spike' | 'ramp' | 'none' | 'insufficient-data' | 'ambiguous';
+export type ConfidenceBand = 'high' | 'medium' | 'low';
+export type SignalName = 'proximity' | 'trace-match' | 'novelty' | 'churn';
+export type EvidenceType = 'log-event' | 'error-group' | 'file-range' | 'feature';
+
+export interface Provenance {
+  logSource: string;
+  historySource: string;
+  logFormat: LogFormat;
+  historyFormat: HistoryFormat;
+  eventCount: number;
+  commitCount: number;
+}
+
+export interface AnalysisLimits {
+  maxLogBytes: number;
+  maxEvents: number;
+  maxStackLines: number;
+  truncated: boolean;
+}
+
+export interface Diagnostic {
+  source: 'logs' | 'history' | 'analysis';
+  code: string;
+  message: string;
+  line: number | null;
+  record: number | null;
+}
+
+export interface OnsetSummary {
+  class: OnsetClass;
+  windowStartUtc: TimestampUtc | null;
+  windowEndUtc: TimestampUtc | null;
+  baselineRate: number;
+  peakRate: number;
+  explanation: string;
+}
+
+export interface IncidentSummary {
+  status: OnsetClass;
+  interpretation: string;
+  onset: OnsetSummary | null;
+}
+
+export interface StackFrame {
+  filePath: string | null;
+  line: number | null;
+  column: number | null;
+  functionName: string | null;
+  vendor: boolean;
+}
+
+export interface ErrorGroup {
+  signature: string;
+  representativeMessage: string;
+  count: number;
+  firstSeenUtc: TimestampUtc;
+  lastSeenUtc: TimestampUtc;
+  eventIds: string[];
+  stackFrames: StackFrame[];
+}
+
+export interface TimelinePoint {
+  bucketStartUtc: TimestampUtc;
+  bucketEndUtc: TimestampUtc;
+  errorCount: number;
+  errorGroupSignatures: string[];
+  commitShas: string[];
+}
+
+export interface EvidenceReference {
+  type: EvidenceType;
+  sourceId: string;
+  path: string | null;
+  lineStart: number | null;
+  lineEnd: number | null;
+  detail: string;
+}
+
+export interface SignalContribution {
+  signal: SignalName;
+  value: number;
+  weight: number;
+  contribution: number;
+  explanation: string;
+  evidenceReferences: EvidenceReference[];
+}
+
+export interface ScoredSuspect {
+  rank: number;
+  sha: string;
+  shortSha: string;
+  subject: string;
+  author: string;
+  committedAtUtc: TimestampUtc;
+  score: number;
+  signals: SignalContribution[];
+  evidenceReferences: EvidenceReference[];
+  tieBreakKey: string;
+}
+
+export interface ConfidenceRationale {
+  band: ConfidenceBand;
+  rationale: string;
+  scoreSeparation: number | null;
+  evidenceCompleteness: number;
+}
+
+export interface TieBreakMetadata {
+  rule: string;
+  appliedOrder: string[];
+}
+
+export interface AnalysisResult {
+  schemaVersion: SchemaVersion;
+  analysisVersion: AnalysisVersion;
+  scoringVersion: ScoringVersion;
+  provenance: Provenance;
+  limits: AnalysisLimits;
+  warnings: string[];
+  assumptions: string[];
+  diagnostics: Diagnostic[];
+  incident: IncidentSummary;
+  errors: ErrorGroup[];
+  timeline: TimelinePoint[];
+  suspects: ScoredSuspect[];
+  confidence: ConfidenceRationale;
+  tieBreak: TieBreakMetadata;
+}
+
+export interface AnalysisInput {
+  logs: { text: string; format: LogFormat };
+  history: { text: string; format: HistoryFormat };
+  options: { bucketMinutes: number; maxLogBytes: number } | null;
+}
