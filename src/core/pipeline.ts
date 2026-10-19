@@ -128,7 +128,8 @@ function hasChangedPathEvidence(groups: ErrorGroup[], commits: AnalysisStream['c
 }
 
 function interpretWeakEvidence(onset: OnsetAnalysis, groups: ErrorGroup[], commits: AnalysisStream['commits']): OnsetAnalysis {
-  if (onset.classification !== 'none' || groups.length === 0 || hasChangedPathEvidence(groups, commits)) return onset;
+  const hasTraceEvidence = groups.some((group) => group.stackFrames.length > 0);
+  if (onset.classification !== 'none' || groups.length === 0 || !hasTraceEvidence || hasChangedPathEvidence(groups, commits)) return onset;
   return cloneOnset(
     onset,
     'ambiguous',
