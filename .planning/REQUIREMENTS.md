@@ -91,16 +91,50 @@ Deferred until the focused browser workflow proves its value and the offline MVP
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation.
+Each explicitly listed v1 requirement maps to exactly one roadmap phase.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| Pending roadmap mapping | — | Pending |
+| INPUT-01 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-02 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-03 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-04 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-05 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-06 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-07 | Phase 2 — Deterministic Analysis Core | Mapped |
+| INPUT-08 | Phase 2 — Deterministic Analysis Core | Mapped |
+| RANK-01 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-02 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-03 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-04 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-05 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-06 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-07 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| UX-01 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-02 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-03 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-04 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-05 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-06 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-07 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-08 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-09 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| FIX-01 | Phase 1 — Foundation and Rebuild Surface | Mapped |
+| FIX-02 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| FIX-03 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| BUILD-01 | Phase 1 — Foundation and Rebuild Surface | Mapped |
+| BUILD-02 | Phase 1 — Foundation and Rebuild Surface | Mapped |
+| BUILD-03 | Phase 1 — Foundation and Rebuild Surface | Mapped |
+| BUILD-04 | Phase 1 — Foundation and Rebuild Surface | Mapped |
+| BUILD-05 | Phase 1 — Foundation and Rebuild Surface | Mapped |
+| POLISH-01 | Phase 5 — Hardening and Conditional Polish | Mapped |
+| POLISH-02 | Phase 5 — Hardening and Conditional Polish | Mapped |
 
 **Coverage:**
-- v1 requirements: 35 total
-- Mapped to phases: 0
-- Unmapped: 35 ⚠️ (roadmap creation will resolve this)
+- Explicitly listed v1 requirements: 34 total
+- Mapped to phases: 34
+- Unmapped: 0
+- Coverage: 100%
 
 ---
 *Requirements defined: 2026-10-19*  
