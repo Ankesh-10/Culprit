@@ -89,6 +89,30 @@ All supplied timestamps are normalized and displayed in UTC. The MVP trusts even
 
 Scores are ranked suspicion, not probability or proof. A high, medium, or low confidence band reflects observable onset quality, evidence coverage, score separation, and input completeness. “No clear culprit” and ambiguous/low-confidence outcomes are valid results and must remain explicit when evidence conflicts or is weak.
 
+## How ranking works
+
+Ranking is a frozen, explainable heuristic (`scoring-v1`). It never uses a model, randomness, or the current time.
+
+- **Eligibility.** A commit is eligible when it was committed at or before the onset window start (inclusive). Later commits are still listed, as not eligible, with the reason.
+- **Score.** `score = 0.35 × proximity + 0.30 × trace match + 0.25 × novelty + 0.10 × churn`. Each signal has a value between 0 and 1; the report shows every value, its weight, and its contribution, and the displayed contributions add up to the score.
+  - *Proximity* halves for every 60 minutes between the commit and the onset window start.
+  - *Trace match* looks at the first application-owned stack frame of each error event: a changed line containing the frame line scores 1.0, a changed line within 5 lines scores 0.6, and a change to the same file scores 0.3. The signal is the average over all error events.
+  - *Novelty* is the share of error events whose signature first appears at or after the commit.
+  - *Churn* is a bounded function of changed lines and files touched and adds at most 0.10.
+- **Rounding.** Scores and contributions are rounded to 6 decimals. Comparisons use integer micro-units, so ordering does not depend on floating-point noise.
+- **Tie-break.** Candidates are ordered by score, then trace match, then the newer commit, then SHA. At most three suspects are shown; remaining eligible commits are listed as also scored.
+- **Confidence band and labels.** A separation below 0.05 between the top two scores, or an ambiguous onset, is labeled `ambiguous`. Fewer than half of the error events matching a changed line is labeled `weak-evidence`. `ambiguous` together with `weak-evidence` is labeled `no-clear-culprit`. Any of these puts the band at low and adds `low-confidence`. Otherwise a gradual ramp, a separation below 0.15, or application stack frames on fewer than three quarters of the error events cap the band at medium; everything else is high.
+- **Export.** The Markdown export escapes all supplied text (commit subjects, authors, log-derived details, diagnostics) so it cannot add headings, links, HTML, or extra lines. Every ranked report states that scores are ranked suspicion, not probability or proof of causality.
+
 ## Limitations
 
-Culprit narrows investigation; it does not roll back code, auto-fix a deployment, establish causality, or replace human review. The initial fixture and serialization foundation does not yet implement the complete parser, onset detector, scoring engine, worker, or investigation console. Those later phases must consume the same fixture files and preserve the local privacy, UTC, determinism, confidence, and rebuild contracts documented here.
+Culprit narrows investigation; it does not roll back code, auto-fix a deployment, establish causality, or replace human review. The parser, onset detector, evidence ranking, and Markdown export are implemented; the worker and investigation console are still pending. Those later phases must consume the same fixture files and preserve the local privacy, UTC, determinism, confidence, and rebuild contracts documented here.
+
+Ranking limits:
+
+- Only the top application frame of each error is scored. There is no credit for a change to a different file in the same directory.
+- Vendor, runtime, build-output, and absolute-path frames are not matched. Top-level directories named `dist`, `build`, `out`, `coverage`, or `internal` are treated as non-application.
+- Novelty treats the start of the supplied log as the start of observation.
+- The onset window can start after the first error; the onset heuristics are unchanged by ranking.
+- History size is not capped yet.
+- Timelines over 10,000 buckets are rejected with an input-limit error.

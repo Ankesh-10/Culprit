@@ -7,11 +7,28 @@ import { serializeCanonicalJson, serializeMarkdown } from '../../src/core/serial
 const checkoutLogs = readFileSync(new URL('../../fixtures/incidents/checkout-outage/logs.jsonl', import.meta.url), 'utf8');
 const checkoutHistory = readFileSync(new URL('../../fixtures/incidents/checkout-outage/history.json', import.meta.url), 'utf8');
 
-function input(logs: string, history: string): AnalysisInput {
+function input(logs: string, history: string, fixtureId = 'checkout-outage'): AnalysisInput {
   return {
-    logs: { text: logs, format: 'jsonl', source: 'fixtures/incidents/checkout-outage/logs.jsonl' },
-    history: { text: history, format: 'culprit-json', source: 'fixtures/incidents/checkout-outage/history.json' },
+    logs: { text: logs, format: 'jsonl', source: `fixtures/incidents/${fixtureId}/logs.jsonl` },
+    history: { text: history, format: 'culprit-json', source: `fixtures/incidents/${fixtureId}/history.json` },
     options: null,
+  };
+}
+
+const rankedFixtureIds = ['checkout-outage', 'slow-burn', 'ambiguous'] as const;
+
+function fixtureText(fixtureId: string, fileName: string): string {
+  return readFileSync(new URL(`../../fixtures/incidents/${fixtureId}/${fileName}`, import.meta.url), 'utf8');
+}
+
+function rankedSerialized(fixtureId: string, logs: string, history: string): { json: string; markdown: string; suspectOrder: string[] } {
+  const outcome = analyze(input(logs, history, fixtureId));
+  if (!outcome.ok) throw outcome.error;
+  const result = toAnalysisResult(outcome.stream);
+  return {
+    json: serializeCanonicalJson(result),
+    markdown: serializeMarkdown(result),
+    suspectOrder: result.suspects.map((suspect) => suspect.sha),
   };
 }
 
@@ -59,6 +76,45 @@ describe('analysis determinism boundary', () => {
       Math.random = () => 0.987654321;
       const variant = serialized(input(checkoutLogs, checkoutHistory));
       expect(variant).toEqual(baseline);
+    } finally {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+      if (originalLocale === undefined) delete process.env.LC_ALL;
+      else process.env.LC_ALL = originalLocale;
+      Date.now = originalDateNow;
+      Math.random = originalRandom;
+    }
+    expect(process.env.TZ).toBe(originalTz);
+    expect(process.env.LC_ALL).toBe(originalLocale);
+    expect(Date.now).toBe(originalDateNow);
+    expect(Math.random).toBe(originalRandom);
+  });
+});
+
+describe('ranked fixture byte identity', () => {
+  it.each(rankedFixtureIds)('keeps ranked JSON, Markdown, and suspect order identical for %s', (fixtureId) => {
+    const logs = fixtureText(fixtureId, 'logs.jsonl');
+    const history = fixtureText(fixtureId, 'history.json');
+    const originalTz = process.env.TZ;
+    const originalLocale = process.env.LC_ALL;
+    const originalDateNow = Date.now;
+    const originalRandom = Math.random;
+    const baseline = rankedSerialized(fixtureId, logs, history);
+
+    expect(baseline.json).toContain('"ranking"');
+    expect(baseline.suspectOrder.length).toBeGreaterThan(0);
+    expect(rankedSerialized(fixtureId, logs, history)).toEqual(baseline);
+    expect(rankedSerialized(fixtureId, reorderLogs(logs), reorderHistory(history))).toEqual(baseline);
+
+    try {
+      for (const timeZone of ['America/Los_Angeles', 'Asia/Kolkata']) {
+        process.env.TZ = timeZone;
+        process.env.LC_ALL = 'fr-FR';
+        Date.now = () => 1;
+        Math.random = () => 0.987654321;
+        expect(rankedSerialized(fixtureId, logs, history)).toEqual(baseline);
+        expect(rankedSerialized(fixtureId, reorderLogs(logs), reorderHistory(history))).toEqual(baseline);
+      }
     } finally {
       if (originalTz === undefined) delete process.env.TZ;
       else process.env.TZ = originalTz;
