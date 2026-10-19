@@ -53,11 +53,11 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 
 ## Phase 3: Evidence, Ranking, and Trust Model
 
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
-- [ ] 03-01: Evidence primitives and frozen scoring model (evidence.ts, scoring.ts, golden scores)
-- [ ] 03-02: Ranker, confidence labels, and result-contract integration (ranking.ts, pipeline wiring, bucket guard)
-- [ ] 03-03: Escaped Markdown export and fixture ranking contracts (markdown.ts, FIX-02/FIX-03, README)
+- [x] 03-01: Evidence primitives and frozen scoring model (evidence.ts, scoring.ts, golden scores)
+- [x] 03-02: Ranker, confidence labels, and result-contract integration (ranking.ts, pipeline wiring, bucket guard)
+- [x] 03-03: Escaped Markdown export and fixture ranking contracts (markdown.ts, FIX-02/FIX-03, README)
 
 **Goal:** Correlate pre-onset history with error evidence using frozen explainable signals and produce an honest, deterministic top-three interpretation for all bundled incidents.
 

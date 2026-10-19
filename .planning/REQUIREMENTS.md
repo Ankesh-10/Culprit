@@ -20,13 +20,13 @@ Requirements for the initial release. Each maps to exactly one roadmap phase.
 
 ### Ranking and Evidence
 
-- [ ] **RANK-01**: System scores eligible pre-onset commits using frozen proximity, trace-match, novelty, and churn signals with documented weights.
-- [ ] **RANK-02**: System returns stable ordering and deterministic tie-breaking for identical inputs, independent of current time, randomness, locale, or machine-specific paths.
-- [ ] **RANK-03**: User can see a top-three suspect shortlist rather than a single unqualified culprit claim.
-- [ ] **RANK-04**: User can inspect each suspect’s total suspicion score and each signal’s contribution in plain language.
-- [ ] **RANK-05**: User can see evidence references for each suspect, including relevant time distance, files/line ranges, matching stack frames, error groups, and churn information when available.
-- [ ] **RANK-06**: System labels low-confidence, ambiguous, weak-evidence, and no-clear-culprit outcomes explicitly instead of presenting a ranked guess as causal proof.
-- [ ] **RANK-07**: System excludes or downweights generic/vendor/generated stack frames and handles path/line-range mismatches without crashing or inventing evidence.
+- [x] **RANK-01**: System scores eligible pre-onset commits using frozen proximity, trace-match, novelty, and churn signals with documented weights.
+- [x] **RANK-02**: System returns stable ordering and deterministic tie-breaking for identical inputs, independent of current time, randomness, locale, or machine-specific paths.
+- [x] **RANK-03**: User can see a top-three suspect shortlist rather than a single unqualified culprit claim.
+- [x] **RANK-04**: User can inspect each suspect’s total suspicion score and each signal’s contribution in plain language.
+- [x] **RANK-05**: User can see evidence references for each suspect, including relevant time distance, files/line ranges, matching stack frames, error groups, and churn information when available.
+- [x] **RANK-06**: System labels low-confidence, ambiguous, weak-evidence, and no-clear-culprit outcomes explicitly instead of presenting a ranked guess as causal proof.
+- [x] **RANK-07**: System excludes or downweights generic/vendor/generated stack frames and handles path/line-range mismatches without crashing or inventing evidence.
 
 ### Investigation Experience
 
@@ -43,8 +43,8 @@ Requirements for the initial release. Each maps to exactly one roadmap phase.
 ### Fixtures and Reproducibility
 
 - [ ] **FIX-01**: The three bundled incidents include plausible commit histories, decoys, logs, expected outcomes, and metadata that explain what each case demonstrates.
-- [ ] **FIX-02**: The known culprit ranks first for the clear checkout case and the intended leading interpretation is stable for the slow-burn and ambiguous cases under automated tests.
-- [ ] **FIX-03**: Repeating analysis with identical fixture input produces byte-identical structured output and Markdown output.
+- [x] **FIX-02**: The known culprit ranks first for the clear checkout case and the intended leading interpretation is stable for the slow-burn and ambiguous cases under automated tests.
+- [x] **FIX-03**: Repeating analysis with identical fixture input produces byte-identical structured output and Markdown output.
 - [ ] **BUILD-01**: Repository setup pins the Node runtime, commits a dependency lockfile, and keeps dependencies installed only within the project.
 - [ ] **BUILD-02**: Docker installs, builds, and runs the project without absolute machine paths or secrets.
 - [ ] **BUILD-03**: A single documented offline test command passes on a clean rebuild, including parser, onset, grouping, scoring, determinism, fixture, and key UI-contract tests.
@@ -103,13 +103,13 @@ Each explicitly listed v1 requirement maps to exactly one roadmap phase.
 | INPUT-06 | Phase 2 — Deterministic Analysis Core | Mapped |
 | INPUT-07 | Phase 2 — Deterministic Analysis Core | Mapped |
 | INPUT-08 | Phase 2 — Deterministic Analysis Core | Mapped |
-| RANK-01 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| RANK-02 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| RANK-03 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| RANK-04 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| RANK-05 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| RANK-06 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| RANK-07 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| RANK-01 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| RANK-02 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| RANK-03 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| RANK-04 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| RANK-05 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| RANK-06 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| RANK-07 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
 | UX-01 | Phase 4 — Incident Console and Investigation Flow | Mapped |
 | UX-02 | Phase 4 — Incident Console and Investigation Flow | Mapped |
 | UX-03 | Phase 4 — Incident Console and Investigation Flow | Mapped |
@@ -120,8 +120,8 @@ Each explicitly listed v1 requirement maps to exactly one roadmap phase.
 | UX-08 | Phase 4 — Incident Console and Investigation Flow | Mapped |
 | UX-09 | Phase 4 — Incident Console and Investigation Flow | Mapped |
 | FIX-01 | Phase 1 — Foundation and Rebuild Surface | Mapped |
-| FIX-02 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
-| FIX-03 | Phase 3 — Evidence, Ranking, and Trust Model | Mapped |
+| FIX-02 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
+| FIX-03 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
 | BUILD-01 | Phase 1 — Foundation and Rebuild Surface | Mapped |
 | BUILD-02 | Phase 1 — Foundation and Rebuild Surface | Mapped |
 | BUILD-03 | Phase 1 — Foundation and Rebuild Surface | Mapped |
