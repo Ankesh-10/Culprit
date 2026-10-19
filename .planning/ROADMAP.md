@@ -8,6 +8,8 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 
 ## Phase 1: Foundation and Rebuild Surface
 
+**Status:** Complete (2026-10-19; PASS WITH LIMITATIONS recorded in `01-VERIFICATION.md`)
+
 **Goal:** Establish a runnable, reproducible project shell and shared fixture contracts so every later vertical slice can be tested and rebuilt.
 
 **Mode:** mvp
@@ -24,6 +26,14 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 **Dependencies:** None.
 
 ## Phase 2: Deterministic Analysis Core
+
+**Status:** Complete (2026-10-19; PASS WITH LIMITATIONS recorded in `02-VERIFICATION.md`)
+
+**Plans:**
+
+- [x] 02-01: Strict input contracts and parsers
+- [x] 02-02: Signatures, fixed UTC buckets, and onset classification
+- [x] 02-03: Pure analyze pipeline and fixture determinism
 
 **Goal:** Turn supported local inputs into a strict, UTC-normalized, deterministic analysis stream with diagnostics, signatures, buckets, and onset classification.
 
