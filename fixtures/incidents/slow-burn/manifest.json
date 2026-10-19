@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "slow-burn",
+  "name": "Slow-burn inventory failure",
+  "purpose": "A gradual error-rate ramp with delayed onset, a growing signature, timestamp offsets, and deploy-adjacent decoys.",
+  "inputFormats": {
+    "logs": "jsonl",
+    "history": "culprit-json"
+  },
+  "expected": {
+    "onsetClass": "ramp",
+    "interpretation": "A delayed inventory reservation change is the leading investigation target; the gradual ramp weakens any claim of an exact causal moment.",
+    "confidence": "medium"
+  },
+  "requiredEvidence": [
+    "onset-window",
+    "application-stack-frame",
+    "changed-line-range",
+    "pre-onset-commit",
+    "gradual-error-rate-ramp"
+  ],
+  "caveats": [
+    "The fixture trusts supplied event timestamps and does not correct for delayed ingestion.",
+    "A ramp identifies a changing operating window, not a single proven deployment cause."
+  ]
+}

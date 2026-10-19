@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "ambiguous",
+  "name": "Ambiguous search regression",
+  "purpose": "Competing pre-onset commits and weak trace evidence produce an honest low-confidence, no-clear-culprit interpretation.",
+  "inputFormats": {
+    "logs": "jsonl",
+    "history": "culprit-json"
+  },
+  "expected": {
+    "onsetClass": "ambiguous",
+    "interpretation": "No clear culprit is established because two plausible changes have competing evidence and the traces do not identify an owned line.",
+    "confidence": "low"
+  },
+  "requiredEvidence": [
+    "onset-window",
+    "competing-pre-onset-commits",
+    "weak-trace-evidence",
+    "low-confidence-rationale"
+  ],
+  "caveats": [
+    "The supplied traces point to a shared dependency and do not identify an application-owned changed line.",
+    "A low-confidence ranking is not evidence that either plausible commit caused the regression."
+  ]
+}

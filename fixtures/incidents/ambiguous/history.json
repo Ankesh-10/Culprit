@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "format": "culprit-json",
+  "repository": "search-service",
+  "commits": [
+    {
+      "sha": "7777777777777777777777777777777777777777",
+      "author": "Eli Turner",
+      "timestamp": "2026-10-19T09:35:00Z",
+      "subject": "feat: add search response cache",
+      "files": [
+        {"path":"src/search/cache.ts","added":31,"deleted":9,"ranges":[{"start":18,"end":51}]}
+      ]
+    },
+    {
+      "sha": "8888888888888888888888888888888888888888",
+      "author": "Samira Holt",
+      "timestamp": "2026-10-19T09:42:00Z",
+      "subject": "refactor: normalize search provider responses",
+      "files": [
+        {"path":"src/search/adapter.ts","added":27,"deleted":18,"ranges":[{"start":44,"end":73}]}
+      ]
+    },
+    {
+      "sha": "9999999999999999999999999999999999999999",
+      "author": "Theo Martin",
+      "timestamp": "2026-10-19T09:55:00Z",
+      "subject": "chore: update search dependency metadata",
+      "files": [
+        {"path":"package.json","added":3,"deleted":3,"ranges":[{"start":12,"end":14}]}
+      ]
+    }
+  ]
+}

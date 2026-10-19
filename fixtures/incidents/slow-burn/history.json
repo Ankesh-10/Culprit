@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "format": "culprit-json",
+  "repository": "inventory-service",
+  "commits": [
+    {
+      "sha": "4444444444444444444444444444444444444444",
+      "author": "Nora Kim",
+      "timestamp": "2026-10-19T07:20:00Z",
+      "subject": "chore: refresh inventory dashboard copy",
+      "files": [
+        {"path":"src/inventory/dashboard.ts","added":15,"deleted":6,"ranges":[{"start":22,"end":36}]}
+      ]
+    },
+    {
+      "sha": "5555555555555555555555555555555555555555",
+      "author": "Owen Brooks",
+      "timestamp": "2026-10-19T07:32:00Z",
+      "subject": "refactor: batch inventory reservation writes",
+      "files": [
+        {"path":"src/inventory/reservation.ts","added":38,"deleted":12,"ranges":[{"start":72,"end":96}]},
+        {"path":"src/inventory/queue.ts","added":20,"deleted":8,"ranges":[{"start":31,"end":58}]}
+      ]
+    },
+    {
+      "sha": "6666666666666666666666666666666666666666",
+      "author": "Priya Nair",
+      "timestamp": "2026-10-19T07:48:00Z",
+      "subject": "fix: expose reservation queue depth metric",
+      "files": [
+        {"path":"src/inventory/metrics.ts","added":11,"deleted":2,"ranges":[{"start":40,"end":52}]}
+      ]
+    }
+  ]
+}
