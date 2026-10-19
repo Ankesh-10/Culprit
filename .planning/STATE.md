@@ -1,14 +1,14 @@
 ---
 gsd_state_version: "1.0"
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-10-19T17:14:48.118Z"
-state_head: ef58206911547fa6632361c4c0f9097de00956d7
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-10-19T17:29:09.455Z"
+state_head: 86c051e51842090477cc87088cbcb721d46843f5
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 11
+  completed_plans: 12
   percent: 60
 current_phase: 4
 current_phase_name: Incident Console and Investigation Flow
@@ -46,6 +46,9 @@ current_phase_name: Incident Console and Investigation Flow
 - [Phase 04]: 04-02: status banner sits outside the live region with a separate announcer so each state change is announced once
 - [Phase 04]: 04-02: sparklines computed on idle via handleAnalyzeRequest on the main thread; a failure omits only that card's line
 - [Phase 04]: 04-03: Files and lines deduplicate on path plus range before taking the first two; confidence.hasLabels drives the info icon; score meters are decorative with numeric score always shown as text
+- [Phase 04]: 04-04: PageUp is step -12 and PageDown +12 on the timeline slider, following the plan literally (reverse of the ARIA slider convention)
+- [Phase 04]: 04-04: Timeline is built once per result and updated in place via view.update(state); ResizeObserver redraws only the SVG so slider focus and the table disclosure survive
+- [Phase 04]: 04-04: Viewport width drives tick count, plot height and #2/#3 label dropping; container width drives SVG width; tooltip text is the readout string split on the separator
 
 ## Blockers
 
@@ -64,8 +67,8 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 
 ## Session Continuity
 
-**Last session:** 2026-10-19T17:14:47.895Z
-**Stopped at:** Completed 04-03-PLAN.md
+**Last session:** 2026-10-19T17:29:09.229Z
+**Stopped at:** Completed 04-04-PLAN.md
 **Resume file:** None
 
 - **Last session:** 2026-10-19 — Phase 2 implementation and verification completed.
@@ -85,3 +88,4 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 | Phase 04 P01 | 5 min | 2 tasks | 13 files |
 | Phase 04 P02 | 10 min | 2 tasks | 14 files |
 | Phase 04 P03 | 6 min | 2 tasks | 8 files |
+| Phase 04 P04 | 14 min | 2 tasks | 9 files |
