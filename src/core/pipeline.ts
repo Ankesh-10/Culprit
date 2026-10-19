@@ -192,7 +192,12 @@ function ensureInput(input: AnalysisInput): { bucketMinutes: number; maxLogBytes
 
 function parsedDiagnostics(logDiagnostics: InputDiagnostic[], historyDiagnostics: InputDiagnostic[]): Diagnostic[] {
   return [...logDiagnostics.map((entry) => ({ entry, source: 'logs' as const })), ...historyDiagnostics.map((entry) => ({ entry, source: 'history' as const }))]
-    .sort((left, right) => diagnosticOrder(left.entry, right.entry))
+    .sort((left, right) => {
+      const sourceOrder = compareText(left.source, right.source);
+      const lineLeft = left.entry.line ?? Number.MAX_SAFE_INTEGER;
+      const lineRight = right.entry.line ?? Number.MAX_SAFE_INTEGER;
+      return sourceOrder || lineLeft - lineRight || compareText(left.entry.code, right.entry.code) || compareText(left.entry.message, right.entry.message);
+    })
     .map(({ entry, source }) => publicDiagnostic(entry, source));
 }
 
