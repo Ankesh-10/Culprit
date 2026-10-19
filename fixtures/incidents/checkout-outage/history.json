@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "format": "culprit-json",
+  "repository": "checkout-service",
+  "commits": [
+    {
+      "sha": "1111111111111111111111111111111111111111",
+      "author": "Mina Patel",
+      "timestamp": "2026-10-19T04:05:00Z",
+      "subject": "chore: refresh checkout dashboard labels",
+      "files": [
+        {"path":"src/checkout/dashboard.ts","added":12,"deleted":4,"ranges":[{"start":18,"end":29}]}
+      ]
+    },
+    {
+      "sha": "2222222222222222222222222222222222222222",
+      "author": "Jordan Lee",
+      "timestamp": "2026-10-19T04:18:00Z",
+      "subject": "refactor: add payment provider retry path",
+      "files": [
+        {"path":"src/checkout/payment.ts","added":46,"deleted":9,"ranges":[{"start":104,"end":126}]},
+        {"path":"src/checkout/handler.ts","added":8,"deleted":2,"ranges":[{"start":36,"end":49}]}
+      ]
+    },
+    {
+      "sha": "3333333333333333333333333333333333333333",
+      "author": "Ravi Shah",
+      "timestamp": "2026-10-19T04:35:00Z",
+      "subject": "fix: restore payment timeout fallback",
+      "files": [
+        {"path":"src/checkout/payment.ts","added":7,"deleted":5,"ranges":[{"start":112,"end":123}]}
+      ]
+    }
+  ]
+}

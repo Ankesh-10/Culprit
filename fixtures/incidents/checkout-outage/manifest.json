@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "checkout-outage",
+  "name": "Checkout outage",
+  "purpose": "A sharp payment timeout spike with a matching application stack frame and realistic deploy-adjacent decoys.",
+  "inputFormats": {
+    "logs": "jsonl",
+    "history": "culprit-json"
+  },
+  "expected": {
+    "onsetClass": "spike",
+    "interpretation": "A payment-path change is the leading investigation target, with temporal and stack evidence but no causal guarantee.",
+    "confidence": "high"
+  },
+  "requiredEvidence": [
+    "onset-window",
+    "application-stack-frame",
+    "changed-line-range",
+    "pre-onset-commit"
+  ],
+  "caveats": [
+    "The fixture trusts supplied event timestamps and does not correct for logging delay.",
+    "A ranked suspect is a prioritization aid, not proof of causality."
+  ]
+}
