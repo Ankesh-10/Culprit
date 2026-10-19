@@ -1,0 +1,12 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [],
+  "next": {
+    "command": "/gsd-debug",
+    "label": "Debug the blocker",
+    "reason": "Blocked · 1 blocker(s) — resolve before continuing"
+  },
+  "updated_at": "2026-10-19T08:00:41.903Z"
+}
