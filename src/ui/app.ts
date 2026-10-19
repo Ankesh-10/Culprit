@@ -43,6 +43,7 @@ export function mountApp(doc: Document): void {
   const resultRegion = required<HTMLElement>(doc, 'result');
   const title = required<HTMLElement>(doc, 'result-title');
   const body = required<HTMLElement>(doc, 'result-body');
+  const skipTimeline = required<HTMLElement>(doc, 'skip-timeline');
   const client = createAnalysisClient();
   const sparklines = new Map<string, readonly number[]>();
   registerLocalFonts();
@@ -120,6 +121,7 @@ export function mountApp(doc: Document): void {
   }
 
   function renderSettled(settled: SettledState): HTMLElement {
+    disposeInvestigation();
     if (settled.phase === 'error') return renderErrorState(settled.failure);
     const stream = settled.stream;
     const panel = buildStatePanel(stream);
@@ -186,6 +188,7 @@ export function mountApp(doc: Document): void {
         showBody(renderEmptyState());
         break;
       case 'loading':
+        if (state.previous === null) disposeInvestigation();
         showBody(state.previous === null ? renderLoadingPlaceholder() : renderSettled(state.previous));
         break;
       case 'done': {
@@ -208,6 +211,7 @@ export function mountApp(doc: Document): void {
         break;
       }
     }
+    skipTimeline.hidden = timelineView === null;
   }
 
   function dispatch(event: PageEvent): void {

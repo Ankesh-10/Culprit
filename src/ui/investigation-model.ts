@@ -241,8 +241,23 @@ export interface TableTwinView {
   hasMore: boolean;
 }
 
+/** One row per interval (the first `tableVisible`), with the onset flag as text and commits as short hashes. */
 export function buildTableTwinRows(stream: AnalysisStream, state: InvestigationState): TableTwinView {
-  void stream;
-  void state;
-  throw new Error('not implemented');
+  const total = stream.timeline.length;
+  const rows: TableTwinRow[] = [];
+  for (let index = 0; index < Math.min(total, state.tableVisible); index += 1) {
+    const point = stream.timeline[index];
+    const bucket = stream.buckets[index];
+    if (point === undefined || bucket === undefined) continue;
+    const commits = commitList(stream, point);
+    rows.push({
+      index,
+      interval: formatUtcInterval(point.bucketStartUtc, point.bucketEndUtc),
+      errors: point.errorCount,
+      signatures: Object.keys(bucket.signatureCounts).length,
+      onset: insideOnsetWindow(point, stream.onset) ? 'Yes' : NONE,
+      commits: commits.length === 0 ? NONE : commits.join(', '),
+    });
+  }
+  return { rows, total, hasMore: total > rows.length };
 }

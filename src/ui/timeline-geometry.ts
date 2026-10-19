@@ -233,15 +233,29 @@ export function commitMarkers(
   commits: readonly CommitTime[],
   suspects: readonly SuspectRef[],
 ): CommitMarker[] {
-  void scale;
-  void domain;
-  void commits;
-  void suspects;
-  throw new Error('not implemented');
+  const byShaRank = new Map(suspects.map((suspect) => [suspect.sha, suspect]));
+  const placed = commits
+    .map((commit) => ({ commit, at: Date.parse(commit.timestampUtc) }))
+    .filter(({ at }) => at >= domain.startMs && at <= domain.endMs)
+    .sort((left, right) => left.at - right.at || (left.commit.sha < right.commit.sha ? -1 : left.commit.sha > right.commit.sha ? 1 : 0));
+  return placed.map(({ commit, at }): CommitMarker => {
+    const suspect = byShaRank.get(commit.sha);
+    const shortSha = suspect?.shortSha ?? commit.sha.slice(0, 7);
+    const x = scale.toX(at);
+    if (suspect !== undefined && suspect.rank === 1) {
+      return { sha: commit.sha, shortSha, kind: 'leading', rank: 1, size: 16, label: `#1 ${shortSha}`, x };
+    }
+    if (suspect !== undefined && (suspect.rank === 2 || suspect.rank === 3)) {
+      return { sha: commit.sha, shortSha, kind: 'ranked', rank: suspect.rank, size: 12, label: `#${suspect.rank}`, x };
+    }
+    return { sha: commit.sha, shortSha, kind: 'other', rank: null, size: 8, label: null, x };
+  });
 }
 
 export interface LabelCandidate {
+  /** `onset`, `rank-1`, `rank-2`, `rank-3` or `peak`. */
   id: string;
+  /** Lower wins: onset 0, "#1" 1, "#2"/"#3" 2, peak 3. */
   priority: number;
   /** Left edge of the label box. */
   x: number;
@@ -251,43 +265,77 @@ export interface LabelCandidate {
 }
 
 export function estimateLabelWidth(text: string): number {
-  void text;
-  throw new Error('not implemented');
+  return text.length * 8 + 8;
 }
 
+/** Moves a label box inside the plot rather than dropping it; a label wider than the plot starts at 0. */
 export function clampLabelX(x: number, width: number, plotWidth: number): number {
-  void x;
-  void width;
-  void plotWidth;
-  throw new Error('not implemented');
+  return Math.max(0, Math.min(x, plotWidth - width));
 }
 
+function intersects(left: LabelCandidate, right: LabelCandidate): boolean {
+  return (
+    left.x < right.x + right.width &&
+    right.x < left.x + left.width &&
+    left.y < right.y + right.height &&
+    right.y < left.y + left.height
+  );
+}
+
+function compareIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+/**
+ * Labels are never nudged or stacked: in priority order (then left to right) each is clamped into the plot
+ * and kept only when it does not intersect one already kept. A dropped label never removes its marker.
+ */
 export function resolveLabels(
   candidates: readonly LabelCandidate[],
   plotWidth: number,
   options: { dropRankLabels: boolean },
 ): Set<string> {
-  void candidates;
-  void plotWidth;
-  void options;
-  throw new Error('not implemented');
+  const ordered = [...candidates].sort((a, b) => a.priority - b.priority || a.x - b.x || compareIds(a.id, b.id));
+  const kept = new Set<string>();
+  const keptBoxes: LabelCandidate[] = [];
+  for (const candidate of ordered) {
+    if (options.dropRankLabels && (candidate.id.startsWith('rank-2') || candidate.id.startsWith('rank-3'))) continue;
+    const box = { ...candidate, x: clampLabelX(candidate.x, candidate.width, plotWidth) };
+    if (keptBoxes.some((other) => intersects(box, other))) continue;
+    keptBoxes.push(box);
+    kept.add(candidate.id);
+  }
+  return kept;
 }
 
 export interface AxisTick {
   ms: number;
+  /** `HH:MM` in UTC. */
   label: string;
 }
 
+/** `count` evenly spaced ticks from the domain start to its end, plus the UTC date shown once. */
 export function computeTicks(
   domain: Pick<TimelineDomain, 'startMs' | 'endMs'>,
   count: number,
 ): { ticks: AxisTick[]; date: string } {
-  void domain;
-  void count;
-  throw new Error('not implemented');
+  const total = Math.max(1, Math.floor(count));
+  const span = domain.endMs - domain.startMs;
+  const ticks: AxisTick[] = [];
+  for (let index = 0; index < total; index += 1) {
+    const ms = total === 1 ? domain.startMs : Math.round(domain.startMs + (span * index) / (total - 1));
+    ticks.push({ ms, label: new Date(ms).toISOString().slice(11, 16) });
+  }
+  return { ticks, date: new Date(domain.startMs).toISOString().slice(0, 10) };
+}
+
+function commitsOutside(count: number, side: 'earlier' | 'later'): string {
+  return `${count} ${side} ${count === 1 ? 'commit is' : 'commits are'} outside this view; see Commits considered.`;
 }
 
 export function domainNote(domain: Pick<TimelineDomain, 'hiddenEarlier' | 'hiddenLater'>): string | null {
-  void domain;
-  throw new Error('not implemented');
+  const parts: string[] = [];
+  if (domain.hiddenEarlier > 0) parts.push(commitsOutside(domain.hiddenEarlier, 'earlier'));
+  if (domain.hiddenLater > 0) parts.push(commitsOutside(domain.hiddenLater, 'later'));
+  return parts.length === 0 ? null : parts.join(' ');
 }
