@@ -14,6 +14,7 @@ export type OnsetClass = 'spike' | 'ramp' | 'none' | 'insufficient-data' | 'ambi
 export type ConfidenceBand = 'high' | 'medium' | 'low';
 export type SignalName = 'proximity' | 'trace-match' | 'novelty' | 'churn';
 export type EvidenceType = 'log-event' | 'error-group' | 'file-range' | 'feature';
+export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 
 export interface Provenance {
   logSource: string;
@@ -60,6 +61,62 @@ export interface StackFrame {
   column: number | null;
   functionName: string | null;
   vendor: boolean;
+}
+
+export interface LogSourceRef {
+  source: string;
+  line: number | null;
+  record: number | null;
+}
+
+export interface LogEvent {
+  eventId: string;
+  timestampUtc: TimestampUtc;
+  level: LogLevel;
+  message: string;
+  rawMessage: string;
+  exception: string | null;
+  stack: string | null;
+  stackFrames: StackFrame[];
+  source: LogSourceRef;
+  rawLine: string;
+}
+
+export interface ParsedLogDocument {
+  format: LogFormat;
+  source: string;
+  events: LogEvent[];
+  diagnostics: import('./input-errors').InputDiagnostic[];
+}
+
+export interface ChangedLineRange {
+  start: number;
+  end: number;
+}
+
+export interface ChangedFile {
+  path: string;
+  added: number;
+  deleted: number;
+  ranges: ChangedLineRange[];
+}
+
+export interface GitCommit {
+  sha: string;
+  author: string;
+  message: string;
+  subject: string;
+  timestampUtc: TimestampUtc;
+  files: ChangedFile[];
+  source: LogSourceRef;
+}
+
+export interface GitHistoryDocument {
+  schemaVersion: 1;
+  format: 'culprit-json';
+  repository: string;
+  commits: GitCommit[];
+  diagnostics: import('./input-errors').InputDiagnostic[];
 }
 
 export interface ErrorGroup {

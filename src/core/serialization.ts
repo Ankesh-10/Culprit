@@ -8,6 +8,9 @@ import type {
   StackFrame,
   TimelinePoint,
 } from './model';
+import { normalizeRepositoryPath, normalizeTimestampUtc } from './normalization';
+
+export { normalizeRepositoryPath } from './normalization';
 
 const SIGNAL_ORDER: SignalContribution['signal'][] = ['proximity', 'trace-match', 'novelty', 'churn'];
 
@@ -23,27 +26,11 @@ function finiteNumber(value: number, label: string): number {
 }
 
 function utcTimestamp(value: string, label: string): string {
-  if (!/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
-    throw new Error(`${label} must include a UTC offset`);
+  try {
+    return normalizeTimestampUtc(value);
+  } catch (error) {
+    throw new Error(`${label} must be a valid ISO timestamp with a UTC offset`, { cause: error });
   }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    throw new Error(`${label} must be a valid timestamp`);
-  }
-  return parsed.toISOString();
-}
-
-/** Normalize a repository path to a relative POSIX identity used by evidence. */
-export function normalizeRepositoryPath(value: string): string {
-  const normalized = value.replaceAll('\\', '/').replace(/^\.\//, '');
-  if (
-    normalized.startsWith('/') ||
-    /^[A-Za-z]:\//.test(normalized) ||
-    normalized.split('/').some((segment) => segment === '..')
-  ) {
-    throw new Error(`Evidence path must be repository-relative: ${value}`);
-  }
-  return normalized;
 }
 
 function canonicalEvidence(reference: EvidenceReference): EvidenceReference {
