@@ -32,5 +32,12 @@
 
 Begin Phase 1 by creating the pinned Node 22 Vite/TypeScript/Vitest project, fixture manifest, canonical serialization contract, Dockerfile, `.env.example`, README, and offline `make test` command; run the checks before proceeding to Phase 2.
 
+## Handoff Policy
+
+- Work is intentionally split across separate chats and sessions.
+- Create or refresh `.planning/HANDOFF.json` and the relevant `.continue-here.md` before ending every session or phase.
+- Resume each new chat with `/gsd-resume-work` before starting implementation.
+- Complete a phase handoff before moving to the next phase; optional polish must not bypass the handoff or verification gates.
+
 ---
 *State initialized: 2026-10-19*
