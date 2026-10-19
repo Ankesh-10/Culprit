@@ -2,26 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Culprit: local, deterministic incident analysis" />
-    <title>Culprit · Incident analysis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Culprit is a local, deterministic incident-analysis console for investigating suspicious commits."
+    />
+    <meta name="theme-color" content="#0b1220" />
+    <meta name="color-scheme" content="dark" />
+    <title>Culprit — Incident analysis</title>
   </head>
   <body>
+    <a class="skip-link" href="#status-title">Skip to incident status</a>
     <main id="app" class="shell" aria-labelledby="app-title">
       <header class="hero">
-        <p class="eyebrow">Local incident console</p>
+        <p class="eyebrow">Offline incident console</p>
         <h1 id="app-title">Culprit</h1>
-        <p class="lede">Find the commits most worth investigating after a production error spike.</p>
+        <p class="lede">
+          Find the commits most worth investigating after a production error spike — with evidence you can verify.
+        </p>
       </header>
-      <section class="status-card" aria-labelledby="status-title">
-        <div>
-          <p class="eyebrow">Foundation ready</p>
+      <section class="status-card" aria-labelledby="status-title" aria-describedby="status-copy">
+        <div class="status-content">
+          <p class="eyebrow">Ready for local input</p>
           <h2 id="status-title">Load an incident to begin</h2>
-          <p id="status-copy">The analysis surface is local and offline. No logs or repository data leave this browser.</p>
+          <p id="status-copy" aria-live="polite">
+            The analysis surface is local and offline. No logs or repository data leave this browser.
+          </p>
         </div>
-        <span class="status-pill" aria-label="Analysis not started">Not started</span>
+        <span class="status-pill" role="status">Not started</span>
       </section>
     </main>
+    <noscript>
+      <p class="noscript-message">Culprit needs JavaScript enabled to run its local analysis console.</p>
+    </noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
