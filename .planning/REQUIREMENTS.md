@@ -30,15 +30,15 @@ Requirements for the initial release. Each maps to exactly one roadmap phase.
 
 ### Investigation Experience
 
-- [ ] **UX-01**: User can load each of the three bundled incidents in one click: checkout outage, slow-burn failure, and ambiguous case.
-- [ ] **UX-02**: User sees a verdict card with the leading suspect’s short hash, message, author, time gap, relevant files/lines, matching error count, score, evidence, and confidence.
-- [ ] **UX-03**: User can explore an accessible timeline showing error rate, incident onset, commit markers, and the highlighted leading suspect on a shared time axis.
-- [ ] **UX-04**: User can select a timeline spike or error group and inspect the underlying log lines through an equivalent non-hover interaction.
-- [ ] **UX-05**: User can open a suspect detail drawer showing relevant diff/line evidence and one explanation per ranking signal.
-- [ ] **UX-06**: User can view error signatures in a table with counts and first-seen times and use a selected signature to filter the timeline.
-- [ ] **UX-07**: User can copy a deterministic Markdown postmortem containing the verdict, evidence, confidence, UTC note, and relevant caveats, with visible success/fallback feedback.
-- [ ] **UX-08**: User can understand empty, loading, error, no-incident, low-confidence, and completed states without relying on color alone.
-- [ ] **UX-09**: User can operate the core result experience with keyboard navigation, visible focus, readable labels, and usable layout at laptop and phone widths.
+- [x] **UX-01**: User can load each of the three bundled incidents in one click: checkout outage, slow-burn failure, and ambiguous case.
+- [x] **UX-02**: User sees a verdict card with the leading suspect’s short hash, message, author, time gap, relevant files/lines, matching error count, score, evidence, and confidence.
+- [x] **UX-03**: User can explore an accessible timeline showing error rate, incident onset, commit markers, and the highlighted leading suspect on a shared time axis.
+- [x] **UX-04**: User can select a timeline spike or error group and inspect the underlying log lines through an equivalent non-hover interaction.
+- [x] **UX-05**: User can open a suspect detail drawer showing relevant diff/line evidence and one explanation per ranking signal.
+- [x] **UX-06**: User can view error signatures in a table with counts and first-seen times and use a selected signature to filter the timeline.
+- [x] **UX-07**: User can copy a deterministic Markdown postmortem containing the verdict, evidence, confidence, UTC note, and relevant caveats, with visible success/fallback feedback.
+- [x] **UX-08**: User can understand empty, loading, error, no-incident, low-confidence, and completed states without relying on color alone.
+- [x] **UX-09**: User can operate the core result experience with keyboard navigation, visible focus, readable labels, and usable layout at laptop and phone widths.
 
 ### Fixtures and Reproducibility
 
@@ -110,15 +110,15 @@ Each explicitly listed v1 requirement maps to exactly one roadmap phase.
 | RANK-05 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
 | RANK-06 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
 | RANK-07 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
-| UX-01 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-02 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-03 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-04 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-05 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-06 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-07 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-08 | Phase 4 — Incident Console and Investigation Flow | Mapped |
-| UX-09 | Phase 4 — Incident Console and Investigation Flow | Mapped |
+| UX-01 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-02 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-03 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-04 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-05 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-06 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-07 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-08 | Phase 4 — Incident Console and Investigation Flow | Complete |
+| UX-09 | Phase 4 — Incident Console and Investigation Flow | Complete |
 | FIX-01 | Phase 1 — Foundation and Rebuild Surface | Mapped |
 | FIX-02 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |
 | FIX-03 | Phase 3 — Evidence, Ranking, and Trust Model | Complete |

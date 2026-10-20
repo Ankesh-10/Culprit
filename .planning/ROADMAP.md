@@ -76,7 +76,7 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 
 ## Phase 4: Incident Console and Investigation Flow
 
-**Plans:** 8/8 plans executed
+**Plans:** 8/8 plans complete
 
 - [x] 04-01: One-click case analysis through the worker boundary (cases.ts, protocol/worker/client, verdict headline, static safety)
 - [x] 04-02: Honest page states and the case-file visual system (state.ts, status.ts, case cards and sparklines, tokens, local fonts with fallback)
