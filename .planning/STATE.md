@@ -1,14 +1,14 @@
 ---
 gsd_state_version: "1.0"
 status: executing
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-10-20T12:36:16.047Z"
-state_head: 4b8f55991a7635b1fdc90ab9014838be23c0797b
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-10-20T12:44:53.939Z"
+state_head: 18ba8e5ee212ead48617bb59f131b86fa65757ab
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 80
 current_phase: 5
 current_phase_name: Hardening and Conditional Polish
@@ -62,6 +62,7 @@ current_phase_name: Hardening and Conditional Polish
 - [Phase 05]: Pin LF via .gitattributes; Docker image proof is delegated to the CI run (05-DOCKER-EVIDENCE.md still pending)
 - [Phase 05]: 05-02: Page Commits considered at 100 rows with in-place Show next 100; bound non-suspect timeline markers to one per pixel column with the top three always drawn; no evidence dropped
 - [Phase 05]: 05-02: Near-cap profile in headless Chrome: result in ~0.3 s, longest long task 68-71 ms, slider and resize 0 ms long tasks; no src/core change
+- [Phase 5]: 05-03: Markdown Limits line uses raw integers and the truncation flag; bundled outputs pinned by SHA-256 fingerprints with no update mode; Host gate GREEN recorded, Docker evidence PENDING
 
 ## Blockers
 
@@ -80,8 +81,8 @@ All 8 Phase 4 plans are executed and the human walk-through is approved. Next: v
 
 ## Session Continuity
 
-**Last session:** 2026-10-20T12:36:15.493Z
-**Stopped at:** Completed 05-02-PLAN.md
+**Last session:** 2026-10-20T12:44:53.386Z
+**Stopped at:** Completed 05-03-PLAN.md
 **Resume file:** None
 
 - **Last session:** 2026-10-19 — Phase 2 implementation and verification completed.
@@ -108,3 +109,4 @@ All 8 Phase 4 plans are executed and the human walk-through is approved. Next: v
 | Phase 04 P08 | 40 min | 3 tasks | 10 files |
 | Phase 05 P01 | 6 min | 2 tasks | 8 files |
 | Phase 05 P02 | 15 min | 3 tasks | 9 files |
+| Phase 5 P03 | 7 min | 2 tasks | 7 files |

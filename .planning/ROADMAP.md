@@ -105,11 +105,11 @@ Culprit is an offline-first, browser-only incident-analysis console. Given a sup
 
 ## Phase 5: Hardening and Conditional Polish
 
-**Plans:** 2/4 plans executed (sequential waves 1-4; one shared working tree)
+**Plans:** 3/4 plans executed (sequential waves 1-4; one shared working tree)
 
 - [x] 05-01-PLAN.md — Clean Linux-oriented rebuild path: tested `scripts/serve-dist.mjs` Docker server (MIME types, CSP, traversal/malformed-path safety), LF-pinned clean-clone rehearsal, GitHub Actions CI with Docker build and probe
 - [x] 05-02-PLAN.md — Near-cap profiling and bounded rendering: deterministic near-cap generator, worker-handler and boundary tests, paged "Commits considered", bounded marker lane, real-browser profile and accessibility sweep
-- [ ] 05-03-PLAN.md — Three-case clean-start rehearsal: limits line in the Markdown, caveat-visibility and output-fingerprint tests, real-browser rehearsal on the production server, README refresh, host gate verdict (Docker item pending)
+- [x] 05-03-PLAN.md — Three-case clean-start rehearsal: limits line in the Markdown, caveat-visibility and output-fingerprint tests, real-browser rehearsal on the production server, README refresh, host gate verdict (Docker item pending)
 - [ ] 05-04-PLAN.md — Gated polish (only with `Host gate: GREEN` plus a recorded PASS Docker build and container probe for the same tree; otherwise omitted): system-aware light theme (POLISH-01) and drawer-scoped J/K suspect stepping with a reduced-motion-gated fade (POLISH-02)
 
 **Goal:** Verify the complete vertical slice on the documented rebuild path, fix trust/accessibility/performance gaps, and only then add optional visual polish behind a green-check gate.
