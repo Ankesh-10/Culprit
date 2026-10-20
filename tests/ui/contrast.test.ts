@@ -465,3 +465,26 @@ describe('gated motion (D-09, D-10, D-12)', () => {
     expect(motionViolations(clean)).toEqual([]);
   });
 });
+
+describe('landing colour pairs (quick 261020-gzd)', () => {
+  it('keeps the progress and weight bars at 3:1 over their grid track', () => {
+    const result = ratio(value('color-ink-2'), value('color-grid'));
+    expect(result).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps tab labels, captions and step text at 4.5:1 on the page and surface', () => {
+    const failures: string[] = [];
+    for (const foreground of ['color-muted', 'color-ink-2', 'color-ink']) {
+      for (const background of ['color-page', 'color-surface']) {
+        const result = ratio(value(foreground), value(background));
+        if (result < 4.5) failures.push(`${foreground} on ${background}: ${round2(result)}`);
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('keeps the selected tab (ink on the raised surface) and its border readable', () => {
+    expect(ratio(value('color-ink'), value('color-raised'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(value('color-control-border'), value('color-page'))).toBeGreaterThanOrEqual(3);
+  });
+});

@@ -66,6 +66,73 @@
             </div>
           </div>
         </section>
+        <section id="features" class="landing-section" aria-labelledby="features-title">
+          <h2 id="features-title" class="section-title">What it does</h2>
+          <div class="feature-tablist" data-tablist hidden>
+            <button type="button" class="feature-tab" id="feature-tab-onset" data-tab="onset">Onset detection</button>
+            <button type="button" class="feature-tab" id="feature-tab-suspects" data-tab="suspects">Ranked suspects</button>
+            <button type="button" class="feature-tab" id="feature-tab-timeline" data-tab="timeline">Linked timeline</button>
+            <button type="button" class="feature-tab" id="feature-tab-drawer" data-tab="drawer">Evidence drawer</button>
+            <button type="button" class="feature-tab" id="feature-tab-postmortem" data-tab="postmortem">Markdown postmortem</button>
+            <button type="button" class="feature-tab" id="feature-tab-offline" data-tab="offline">Private and offline</button>
+          </div>
+          <section class="feature-panel" id="feature-panel-onset" data-panel="onset" aria-labelledby="feature-heading-onset">
+            <h3 id="feature-heading-onset">Find when the errors started</h3>
+            <p>Culprit buckets error events on a UTC timeline and finds the interval where the rate breaks from its baseline. It labels the shape as a sharp spike, a slow ramp or ambiguous, and says so when it cannot tell. Timestamps with offsets are normalized to UTC first.</p>
+            <div class="preview-slot" data-preview="onset"></div>
+          </section>
+          <section class="feature-panel" id="feature-panel-suspects" data-panel="suspects" aria-labelledby="feature-heading-suspects">
+            <h3 id="feature-heading-suspects">Rank the commits worth checking first</h3>
+            <p>Every commit made at or before the start of the onset window gets a fixed-weight score from four signals: proximity 0.35, trace match 0.30, novelty 0.25, churn 0.10. The weights are frozen in the code, so the same input always gives the same order. A score is ranked suspicion, not proof.</p>
+            <div class="preview-slot" data-preview="suspects"></div>
+          </section>
+          <section class="feature-panel" id="feature-panel-timeline" data-panel="timeline" aria-labelledby="feature-heading-timeline">
+            <h3 id="feature-heading-timeline">See errors and commits on one UTC axis</h3>
+            <p>The error rate, the onset window and the commits share one time axis, with the top suspects marked. Filter by error signature, step through intervals with the arrow keys, or read the same values in the data table, so nothing depends on hover.</p>
+            <div class="preview-slot" data-preview="timeline"></div>
+          </section>
+          <section class="feature-panel" id="feature-panel-drawer" data-panel="drawer" aria-labelledby="feature-heading-drawer">
+            <h3 id="feature-heading-drawer">Check the arithmetic behind every rank</h3>
+            <p>The drawer shows each signal's value, weight and contribution, the changed files and line ranges, and where they overlap stack frames in the log. The history export lists line ranges, not diff text, so open the commit in your repository to read the diff.</p>
+            <div class="preview-slot" data-preview="drawer"></div>
+          </section>
+          <section class="feature-panel" id="feature-panel-postmortem" data-panel="postmortem" aria-labelledby="feature-heading-postmortem">
+            <h3 id="feature-heading-postmortem">Copy a postmortem you can paste anywhere</h3>
+            <p>One button copies a Markdown summary of the verdict, evidence, confidence and caveats. The same deterministic serializer produces it every time; if the clipboard is unavailable, the text appears selected so you can copy it by hand.</p>
+            <div class="preview-slot" data-preview="postmortem"></div>
+          </section>
+          <section class="feature-panel" id="feature-panel-offline" data-panel="offline" aria-labelledby="feature-heading-offline">
+            <h3 id="feature-heading-offline">Nothing leaves your browser</h3>
+            <p>Logs and history are read and analyzed on this page; nothing is uploaded and no account is needed. Culprit makes no network requests, so it keeps working without a connection once the page is open, and the same input always produces the same bytes.</p>
+            <ul class="offline-facts">
+              <li>No network code: tests/ui/static-safety.test.ts fails npm test if the source uses a network or storage API or contains an absolute URL.</li>
+              <li>Byte-identical output: tests/core/determinism.test.ts runs the same analysis repeatedly and compares the bytes.</li>
+              <li>Local analysis: the previews on this page were computed in your browser from the bundled fixtures.</li>
+            </ul>
+            <div class="preview-slot" data-preview="offline"></div>
+          </section>
+        </section>
+        <section id="trust" class="landing-section" aria-labelledby="trust-title">
+          <h2 id="trust-title" class="section-title">How it works</h2>
+          <ul class="trust-list">
+            <li><strong>Inputs:</strong> a Culprit JSON history export plus JSON-lines or plain-text logs, up to 1 MiB and 10,000 events.</li>
+            <li><strong>Deterministic UTC output:</strong> the same input gives byte-identical results, with every time shown in UTC.</li>
+            <li><strong>Ranked suspicion, not proof:</strong> Culprit tells you where to look first; a person still confirms the cause.</li>
+          </ul>
+        </section>
+        <section id="start" class="landing-section landing-cta" aria-labelledby="start-title">
+          <h2 id="start-title" class="section-title">Start with a bundled incident</h2>
+          <p class="cta-copy">Three bundled cases show a sharp spike, a slow ramp and an ambiguous result, or bring your own log and history.</p>
+          <div class="hero-actions">
+            <a class="button-primary" href="#/app" data-try-case="checkout-outage">Try the checkout outage</a>
+            <a class="button-secondary" href="#/app">Open the console</a>
+          </div>
+          <p class="key-hint">Press <kbd>/</kbd> to jump to a case.</p>
+        </section>
+        <footer class="landing-footer">
+          <p><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-lock" /></svg>Local only: nothing leaves this browser.</p>
+          <p><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-clock" /></svg>All times UTC.</p>
+        </footer>
       </main>
     </div>
     <div id="view-app" class="view" hidden>

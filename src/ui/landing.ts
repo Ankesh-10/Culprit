@@ -1,5 +1,7 @@
 import { el } from './dom';
-import { bundledStream, renderHeroCard } from './landing-preview';
+import { FEATURE_TABS } from './landing-model';
+import { bundledStream, renderFeaturePreview, renderHeroCard } from './landing-preview';
+import { mountFeatureTabs } from './landing-tabs';
 import { playEntrance } from './motion';
 import type { MotionScope } from './motion';
 
@@ -38,6 +40,25 @@ export function mountLanding(doc: Document, options: LandingOptions): LandingVie
     });
   }
 
+  function runWhenIdle(task: () => void): void {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(() => task());
+    else setTimeout(task, 0);
+  }
+
+  /** Each feature preview is built on idle time, so the hero and the tabs are never blocked by a heavier one. */
+  function buildFeatures(): void {
+    const features = required<HTMLElement>(doc, '#features');
+    mountFeatureTabs(features);
+    for (const tab of FEATURE_TABS) {
+      runWhenIdle(() => {
+        const slot = features.querySelector<HTMLElement>(`[data-preview="${tab.id}"]`);
+        if (slot === null) return;
+        const frame = renderFeaturePreview(tab.id, 'feature');
+        slot.append(frame ?? el('p', { className: 'preview-unavailable', text: 'Preview unavailable.' }));
+      });
+    }
+  }
+
   let built = false;
   let heroScope: MotionScope | null = null;
 
@@ -58,6 +79,7 @@ export function mountLanding(doc: Document, options: LandingOptions): LandingVie
       if (built) return;
       built = true;
       buildHero();
+      buildFeatures();
     },
     hide(): void {
       heroScope?.dispose();
