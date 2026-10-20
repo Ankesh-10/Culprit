@@ -9,7 +9,7 @@
     />
     <meta name="theme-color" content="#07080a" />
     <meta name="color-scheme" content="dark" />
-    <title>Culprit — Incident analysis</title>
+    <title>Culprit: find the commit that broke it</title>
   </head>
   <body>
     <div class="ambient" aria-hidden="true">
@@ -34,6 +34,41 @@
       <symbol id="icon-chevron-right" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5" /></symbol>
       <symbol id="icon-file" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 1.5h5.5L13 5v9.5H4Z" /><path d="M9.5 1.5V5H13" /></symbol>
     </svg>
+    <p id="route-status" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+    <div id="view-landing" class="view">
+      <a class="skip-link" href="#landing-title">Skip to content</a>
+      <header class="site-header landing-header">
+        <div class="header-stripes" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="brand">
+          <svg class="icon wordmark-glyph" width="20" height="20" aria-hidden="true" focusable="false"><use href="#icon-diamond" /></svg>
+          <p class="wordmark">Culprit</p>
+        </div>
+        <nav class="site-nav" aria-label="Site">
+          <a data-route="landing" href="#/">Home</a>
+          <a data-route="app" href="#/app">Console</a>
+        </nav>
+      </header>
+      <main id="landing" class="landing">
+        <section class="hero" aria-labelledby="landing-title">
+          <h1 id="landing-title" tabindex="-1">Which commit broke production?</h1>
+          <div class="hero-grid">
+            <div class="hero-copy">
+              <p class="hero-lede">Paste an error log and your git history and get a ranked, explainable shortlist of the commits to check first, entirely in your browser.</p>
+              <div class="hero-actions">
+                <a class="button-primary" href="#/app" data-try-case="checkout-outage">Try the checkout outage</a>
+                <a class="button-secondary" href="#/app">Open the console</a>
+              </div>
+              <p class="key-hint">Press <kbd>/</kbd> to jump to a case.</p>
+            </div>
+            <div class="hero-preview">
+              <div class="header-stripes is-hero" aria-hidden="true"><span></span><span></span><span></span></div>
+              <div class="preview-slot" data-preview="hero"></div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+    <div id="view-app" class="view" hidden>
     <a class="skip-link" href="#result">Skip to results</a>
     <a class="skip-link" id="skip-timeline" href="#timeline-title" hidden>Skip to timeline</a>
     <main id="app" class="shell">
@@ -48,10 +83,14 @@
           <li class="chip"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-lock" /></svg>Local only: nothing leaves this browser</li>
           <li class="chip"><svg class="icon" width="16" height="16" aria-hidden="true" focusable="false"><use href="#icon-clock" /></svg>All times UTC</li>
         </ul>
+        <nav class="site-nav" aria-label="Site">
+          <a data-route="landing" href="#/">Home</a>
+          <a data-route="app" href="#/app">Console</a>
+        </nav>
       </header>
       <section id="input-panel" class="panel" aria-labelledby="input-title">
         <div class="panel-heading-row">
-          <h2 id="input-title">Load an incident</h2>
+          <h2 id="input-title" tabindex="-1">Load an incident</h2>
           <button type="button" id="palette-trigger" class="button-secondary palette-trigger" aria-haspopup="dialog" aria-keyshortcuts="/ Control+K Meta+K">Press <kbd>/</kbd> to jump to a case</button>
         </div>
         <div id="case-picker" class="case-picker"></div>
@@ -65,6 +104,7 @@
         <div id="result-body"></div>
       </section>
     </main>
+    </div>
     <noscript>
       <p class="noscript-message">Culprit needs JavaScript enabled to run its local analysis console.</p>
     </noscript>

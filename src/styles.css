@@ -48,6 +48,7 @@
   --hit-min: 44px;
 
   --text-display: 48px;
+  --text-hero: 64px;
   --text-heading: 24px;
   --text-body: 16px;
   --text-label: 14px;
@@ -2331,6 +2332,226 @@ kbd {
 
 .palette-footer .key-hint { margin: 0; }
 
+/* Landing view (quick 261020-gzd)
+   A second view in the same page. It uses only the tokens above: the surface ladder, hairlines, the white
+   primary and the flat stripe band. --text-hero is the one landing-only size. */
+
+.landing-header {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: var(--space-md);
+}
+
+@media (min-width: 640px) {
+  .landing-header { padding: var(--space-lg); }
+}
+
+.landing-header .brand { margin-right: auto; }
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+
+.site-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit-min);
+  padding: 0 var(--space-sm);
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-label);
+  text-decoration: none;
+}
+
+.site-nav a:hover { color: var(--color-ink); }
+
+.site-nav a[aria-current="page"] {
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
+}
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xl);
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-md) var(--space-2xl);
+}
+
+@media (min-width: 640px) {
+  .landing { padding: var(--space-lg) var(--space-lg) var(--space-3xl); }
+}
+
+a.button-primary,
+a.button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
+
+.hero h1 {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--text-heading);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-display);
+}
+
+@media (min-width: 640px) {
+  .hero h1 { font-size: var(--text-display); }
+}
+
+@media (min-width: 1024px) {
+  .hero h1 { font-size: var(--text-hero); }
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .hero-grid { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--space-2xl); }
+}
+
+.hero-lede {
+  max-width: 56ch;
+  margin: 0 0 var(--space-lg);
+  color: var(--color-ink-2);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.hero-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: var(--space-lg);
+  border-radius: var(--radius-card);
+}
+
+.header-stripes.is-hero { width: 60%; }
+
+.preview-slot { position: relative; }
+
+.preview-unavailable {
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
+.preview-frame {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.preview-caption {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-muted);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.preview-body { min-width: 0; }
+
+.hero-card { border-color: var(--color-hairline-strong); }
+
+.hero-card-label {
+  margin: 0 0 var(--space-xs);
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.hero-hash,
+.hero-other-hash {
+  font-feature-settings: normal;
+  font-variant-ligatures: none;
+  font-family: var(--font-mono);
+}
+
+.hero-hash {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-heading);
+}
+
+.hero-subject {
+  margin: 0 0 var(--space-md);
+  overflow-wrap: anywhere;
+}
+
+.hero-card .confidence { margin-top: var(--space-md); }
+
+.hero-trend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.hero-sparkline { flex: 1 1 120px; max-width: 200px; }
+
+.hero-trend-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.hero-window {
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.hero-others {
+  margin: var(--space-md) 0 0;
+  padding: var(--space-sm) 0 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.hero-others li {
+  display: flex;
+  gap: var(--space-md);
+  padding: var(--space-xs) 0;
+}
+
+.hero-other-score { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.hero-caveat {
+  margin: var(--space-md) 0 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
 /* Motion (POLISH-02 early, quick 261020-ftp)
    One consolidated block. Everything that moves lives inside the no-preference media query, so the base
    state (no query, no script, reduced motion) is already the final state. Only transform, opacity and
@@ -2526,5 +2747,13 @@ kbd {
 
   .command-palette[open]::backdrop {
     animation: motion-fade 200ms ease-out backwards;
+  }
+
+  /* Landing hero card: the error-rate line wipes in from its left edge after the card rises. */
+  .motion-enter .hero-trend .sparkline-line {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: motion-wipe 700ms var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 300ms);
   }
 }

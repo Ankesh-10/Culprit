@@ -60,7 +60,21 @@ const timerScheduler: Scheduler = (callback, delayMs) => {
   return () => clearTimeout(handle);
 };
 
-export function mountApp(doc: Document): void {
+export interface ConsoleApi {
+  /** Loads a bundled case by id (a no-op for an unknown id). */
+  loadCase(id: string): void;
+  /** The console view became visible: runs the idle sparkline analysis once. */
+  activate(): void;
+  /** The console view was hidden: a modal drawer must not stay open over the landing. */
+  deactivate(): void;
+}
+
+export interface MountAppOptions {
+  /** Asks the shell to show the console view (the palette also works from the landing view). */
+  onOpenConsole?: () => void;
+}
+
+export function mountApp(doc: Document, options: MountAppOptions = {}): ConsoleApi {
   const picker = required<HTMLElement>(doc, 'case-picker');
   const statusRegion = required<HTMLElement>(doc, 'status-region');
   const resultRegion = required<HTMLElement>(doc, 'result');
@@ -429,6 +443,28 @@ export function mountApp(doc: Document): void {
 
   renderPicker();
   render({ phase: 'idle' });
-  computeSparklines();
-  mountCommandPalette(doc, { entries: paletteEntries(BUNDLED_CASES), onLoad: loadById, onOwnFiles: () => fixInput('log') });
+  mountCommandPalette(doc, {
+    entries: paletteEntries(BUNDLED_CASES),
+    onLoad: (id) => {
+      options.onOpenConsole?.();
+      loadById(id);
+    },
+    onOwnFiles: () => {
+      options.onOpenConsole?.();
+      fixInput('log');
+    },
+  });
+
+  let sparklinesStarted = false;
+  return {
+    loadCase: loadById,
+    activate(): void {
+      if (sparklinesStarted) return;
+      sparklinesStarted = true;
+      computeSparklines();
+    },
+    deactivate(): void {
+      dismissSuspectDrawer(drawer);
+    },
+  };
 }
