@@ -39,7 +39,11 @@ describe('repository rebuild surface', () => {
     expect(dockerfile).toContain('COPY --from=build /app/dist ./dist');
     expect(dockerfile).toContain('EXPOSE 4173');
     expect(dockerfile).toContain('HEALTHCHECK');
-    expect(dockerfile).toContain('server.listen(4173');
+    expect(dockerfile).toContain('COPY --from=build /app/scripts/serve-dist.mjs ./scripts/serve-dist.mjs');
+    expect(dockerfile).toContain('USER node');
+    expect(dockerfile).toContain('CMD ["node", "scripts/serve-dist.mjs"]');
+    expect(readProjectFile('scripts/serve-dist.mjs')).toContain('4173');
+    expect(readProjectFile('scripts/serve-dist.mjs')).toContain('0.0.0.0');
     expect(dockerfile).not.toMatch(/npm install -g|npm i -g/);
   });
 
@@ -83,7 +87,7 @@ describe('repository rebuild surface', () => {
 
   it('keeps environment and rebuild instructions secret-free and repository-relative', () => {
     const envExample = readProjectFile('.env.example');
-    const contractFiles = ['Dockerfile', '.dockerignore', '.env.example', 'Makefile', 'README.md', 'vite.config.ts', 'src/main.ts', 'src/styles.css'];
+    const contractFiles = ['Dockerfile', '.dockerignore', '.env.example', 'Makefile', 'README.md', 'vite.config.ts', 'src/main.ts', 'src/styles.css', 'scripts/serve-dist.mjs'];
     const contractText = contractFiles.map(readProjectFile).join('\n');
     const repositoryText = contractFiles.filter((path) => path !== 'Dockerfile').map(readProjectFile).join('\n');
 
