@@ -102,3 +102,7 @@ Culprit narrows an investigation; it does not establish causality, roll back cod
 - Timelines over 10,000 buckets are rejected. Long lists render 100 rows at a time.
 - A near-cap input (about 1 MB, 9,990 events) analyzed in roughly 0.3 s in headless Chrome on one machine. Treat this as a single measurement, not a guarantee.
 - The `/` shortcut cannot be turned off (WCAG 2.1.4); Ctrl or Cmd+K and the visible button do the same thing.
+
+## License
+
+MIT. See `LICENSE`.
