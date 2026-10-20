@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AnalysisStream } from '../../src/core/model';
-import { DIFF_NOTE, DRAWER_CAVEAT, SIGNAL_TITLES, buildDrawerView } from '../../src/ui/drawer-model';
-import type { DrawerView } from '../../src/ui/drawer-model';
+import { DIFF_NOTE, DRAWER_CAVEAT, DRAWER_STEP_KEYS, SIGNAL_TITLES, buildDrawerView, drawerStepTarget } from '../../src/ui/drawer-model';
+import type { DrawerView, StepKeyEvent } from '../../src/ui/drawer-model';
 import { findCase, toAnalysisInput } from '../../src/ui/cases';
 import { handleAnalyzeRequest } from '../../src/worker/protocol';
 
@@ -275,5 +275,79 @@ describe('evidence list', () => {
     const suspect = AMBIGUOUS.ranking.suspects[0];
     expect(items.map((item) => item.detail)).toEqual((suspect?.evidenceReferences ?? []).map((reference) => reference.detail));
     expect(items.some((item) => item.typeLabel === 'Log event')).toBe(false);
+  });
+});
+
+describe('drawerStepTarget (POLISH-02)', () => {
+  const key = (name: string, overrides: Partial<StepKeyEvent> = {}): StepKeyEvent => ({
+    key: name,
+    ctrlKey: false,
+    metaKey: false,
+    altKey: false,
+    isComposing: false,
+    inEditable: false,
+    ...overrides,
+  });
+  const first = { prevRank: null, nextRank: 2 };
+  const last = { prevRank: 2, nextRank: null };
+  const only = { prevRank: null, nextRank: null };
+  const middle = { prevRank: 1, nextRank: 3 };
+
+  it('names the two keys', () => {
+    expect(DRAWER_STEP_KEYS).toEqual({ next: 'J', previous: 'K' });
+  });
+
+  it('steps next on j and J and previous on k and K', () => {
+    expect(drawerStepTarget(middle, key('j'))).toBe(3);
+    expect(drawerStepTarget(middle, key('J'))).toBe(3);
+    expect(drawerStepTarget(middle, key('k'))).toBe(1);
+    expect(drawerStepTarget(middle, key('K'))).toBe(1);
+  });
+
+  it('does nothing past the ends: no wrap', () => {
+    expect(drawerStepTarget(first, key('k'))).toBeNull();
+    expect(drawerStepTarget(first, key('j'))).toBe(2);
+    expect(drawerStepTarget(last, key('j'))).toBeNull();
+    expect(drawerStepTarget(last, key('k'))).toBe(2);
+  });
+
+  it('does nothing with a single suspect', () => {
+    expect(drawerStepTarget(only, key('j'))).toBeNull();
+    expect(drawerStepTarget(only, key('k'))).toBeNull();
+  });
+
+  it.each<[string, Partial<StepKeyEvent>]>([
+    ['Ctrl', { ctrlKey: true }],
+    ['Meta', { metaKey: true }],
+    ['Alt', { altKey: true }],
+    ['IME composition', { isComposing: true }],
+    ['an editable target', { inEditable: true }],
+  ])('ignores j and k with %s', (_label, overrides) => {
+    expect(drawerStepTarget(middle, key('j', overrides))).toBeNull();
+    expect(drawerStepTarget(middle, key('k', overrides))).toBeNull();
+  });
+
+  it.each(['ArrowRight', 'ArrowLeft', 'n', 'p', 'Enter', ' ', '/', 'Escape', 'Tab', 'jj'])('ignores the key %j', (name) => {
+    expect(drawerStepTarget(middle, key(name))).toBeNull();
+  });
+
+  it('walks the slow-burn lineup exactly as Next and Previous do', () => {
+    const stream = bundledStream('slow-burn');
+    const walk = (start: number, name: string): Array<number | null> => {
+      const seen: Array<number | null> = [];
+      let rank = start;
+      for (let step = 0; step < 3; step += 1) {
+        const target = drawerStepTarget(drawer(stream, rank), key(name));
+        seen.push(target);
+        if (target === null) break;
+        rank = target;
+      }
+      return seen;
+    };
+    expect(walk(1, 'j')).toEqual([2, 3, null]);
+    expect(walk(3, 'k')).toEqual([2, 1, null]);
+    const view = drawer(stream, 2);
+    expect(drawerStepTarget(view, key('j'))).toBe(view.nextRank);
+    expect(drawerStepTarget(view, key('k'))).toBe(view.prevRank);
   });
 });

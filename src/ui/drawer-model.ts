@@ -187,3 +187,30 @@ export function buildDrawerView(stream: AnalysisStream, rank: number): DrawerVie
     ),
   };
 }
+
+/** The key facts `drawerStepTarget` needs; the drawer builds one from a KeyboardEvent. */
+export interface StepKeyEvent {
+  key: string;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  altKey: boolean;
+  /** The key press is part of an IME composition. */
+  isComposing: boolean;
+  /** The event target is a text field, select or contenteditable element. */
+  inEditable: boolean;
+}
+
+/** Supplementary single-key shortcuts for suspect stepping, live only while the drawer is open. */
+export const DRAWER_STEP_KEYS = { next: 'J', previous: 'K' } as const;
+
+/**
+ * The rank a J or K press moves to, or null when nothing should happen: any other key, a modified key, an IME
+ * composition, an editable target, or an end of the lineup (no wrap, matching the disabled buttons).
+ */
+export function drawerStepTarget(ranks: Pick<DrawerView, 'prevRank' | 'nextRank'>, event: StepKeyEvent): number | null {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.inEditable) return null;
+  const key = event.key.toUpperCase();
+  if (key === DRAWER_STEP_KEYS.next) return ranks.nextRank;
+  if (key === DRAWER_STEP_KEYS.previous) return ranks.prevRank;
+  return null;
+}

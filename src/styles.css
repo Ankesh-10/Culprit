@@ -1963,6 +1963,8 @@ kbd {
   overflow-wrap: anywhere;
 }
 
+.drawer-key-hint { margin: var(--space-xs) 0 0; }
+
 .drawer-body {
   display: grid;
   gap: var(--space-lg);
@@ -3079,6 +3081,11 @@ a.button-secondary {
 
   .suspect-drawer[open]::backdrop {
     animation: motion-fade 200ms ease-out backwards;
+  }
+
+  /* Stepping to a neighbour suspect (J, K or the buttons) fades the new body in; opacity only, no delay on text. */
+  .suspect-drawer .drawer-body.is-step {
+    animation: motion-fade var(--motion-fast) var(--motion-ease-out) backwards;
   }
 
   @media (max-width: 639px) {

@@ -1,5 +1,5 @@
 import { clear, el, icon } from './dom';
-import { DRAWER_CAVEAT } from './drawer-model';
+import { DRAWER_CAVEAT, DRAWER_STEP_KEYS, drawerStepTarget } from './drawer-model';
 import type { DrawerEvidenceItem, DrawerFile, DrawerSignalRow, DrawerView } from './drawer-model';
 import { NO_RANGES_TEXT } from './view-model';
 import { renderScoreMeter } from './verdict';
@@ -16,6 +16,11 @@ export interface DrawerHandlers {
 interface DrawerSession {
   opener: HTMLElement | null;
   rank: number;
+  /** Neighbouring ranks of the suspect on show, for the J and K shortcuts. */
+  prevRank: number | null;
+  nextRank: number | null;
+  /** The same handler the Previous and Next suspect buttons call. */
+  onStep: (rank: number) => void;
   /** False when the drawer closes because the reader chose to leave it for the log lines. */
   restoreFocus: boolean;
   fallback: () => void;
@@ -30,10 +35,14 @@ function section(title: string, children: Array<HTMLElement | SVGElement>): HTML
   return el('section', { className: 'drawer-section' }, [el('h3', { text: title }), ...children]);
 }
 
-function navButton(label: string, iconName: string, disabled: boolean, onClick: () => void): HTMLButtonElement {
+function navButton(label: string, iconName: string, disabled: boolean, shortcut: string, onClick: () => void): HTMLButtonElement {
   const button = el(
     'button',
-    { className: 'button-secondary drawer-nav-button', attrs: { type: 'button', 'aria-label': label }, on: { click: onClick } },
+    {
+      className: 'button-secondary drawer-nav-button',
+      attrs: { type: 'button', 'aria-label': label, 'aria-keyshortcuts': shortcut },
+      on: { click: onClick },
+    },
     [icon(iconName, 'icon'), el('span', { className: 'drawer-button-label', text: label })],
   );
   button.disabled = disabled;
@@ -52,16 +61,23 @@ function renderHeader(view: DrawerView, handlers: DrawerHandlers, close: () => v
     el('div', { className: 'drawer-title-row' }, [
       el('h2', { className: 'drawer-title', text: view.title, attrs: { id: DRAWER_TITLE_ID, tabindex: '-1' } }),
       el('div', { className: 'drawer-controls' }, [
-        navButton('Previous suspect', 'chevron-left', previous === null, () => {
+        navButton('Previous suspect', 'chevron-left', previous === null, DRAWER_STEP_KEYS.previous, () => {
           if (previous !== null) handlers.onStep(previous);
         }),
-        navButton('Next suspect', 'chevron-right', next === null, () => {
+        navButton('Next suspect', 'chevron-right', next === null, DRAWER_STEP_KEYS.next, () => {
           if (next !== null) handlers.onStep(next);
         }),
         closeButton,
       ]),
     ]),
     el('p', { className: 'drawer-subject', text: view.subject }),
+    el('p', { className: 'key-hint drawer-key-hint' }, [
+      'Keys: ',
+      el('kbd', { text: DRAWER_STEP_KEYS.next }),
+      ' next suspect, ',
+      el('kbd', { text: DRAWER_STEP_KEYS.previous }),
+      ' previous suspect',
+    ]),
   ]);
 }
 
@@ -192,6 +208,12 @@ function restoreFocus(dialog: HTMLDialogElement, session: DrawerSession): void {
   session.fallback();
 }
 
+/** True for a text field, select or contenteditable element: typing there must never step suspects. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+}
+
 function wire(dialog: HTMLDialogElement): void {
   if (wired.has(dialog)) return;
   wired.add(dialog);
@@ -200,6 +222,24 @@ function wire(dialog: HTMLDialogElement): void {
     const session = sessions.get(dialog);
     sessions.delete(dialog);
     if (session !== undefined && session.restoreFocus) restoreFocus(dialog, session);
+  });
+  // J and K step suspects only while this dialog has focus (never on document or window), through the same
+  // handler as the visible buttons. Each keydown, auto-repeat included, moves at most one suspect.
+  dialog.addEventListener('keydown', (event) => {
+    if (event.defaultPrevented) return;
+    const session = sessions.get(dialog);
+    if (session === undefined) return;
+    const target = drawerStepTarget(session, {
+      key: event.key,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      altKey: event.altKey,
+      isComposing: event.isComposing,
+      inEditable: isEditableTarget(event.target),
+    });
+    if (target === null) return;
+    event.preventDefault();
+    session.onStep(target);
   });
   // A click on the backdrop lands on the dialog element itself, never on its content.
   dialog.addEventListener('click', (event) => {
@@ -211,6 +251,8 @@ function fill(dialog: HTMLDialogElement, view: DrawerView, handlers: DrawerHandl
   clear(dialog);
   dialog.scrollTop = 0;
   dialog.append(renderDrawerContent(view, handlers, () => dialog.close()));
+  // Only the step path fades the new content in (CSS, reduced-motion gated); the first open does not.
+  dialog.querySelector('.drawer-body')?.classList.add('is-step');
   dialog.querySelector<HTMLElement>(`#${DRAWER_TITLE_ID}`)?.focus();
 }
 
@@ -230,7 +272,15 @@ export function openSuspectDrawer(
     updateSuspectDrawer(dialog, view, handlers);
     return;
   }
-  sessions.set(dialog, { opener, rank: view.rank, restoreFocus: true, fallback });
+  sessions.set(dialog, {
+    opener,
+    rank: view.rank,
+    prevRank: view.prevRank,
+    nextRank: view.nextRank,
+    onStep: handlers.onStep,
+    restoreFocus: true,
+    fallback,
+  });
   clear(dialog);
   dialog.append(renderDrawerContent(view, handlers, () => dialog.close()));
   dialog.showModal();
@@ -240,7 +290,12 @@ export function openSuspectDrawer(
 /** Re-renders the open drawer in place (Previous or Next suspect) and puts focus back on its title. */
 export function updateSuspectDrawer(dialog: HTMLDialogElement, view: DrawerView, handlers: DrawerHandlers): void {
   const session = sessions.get(dialog);
-  if (session !== undefined) session.rank = view.rank;
+  if (session !== undefined) {
+    session.rank = view.rank;
+    session.prevRank = view.prevRank;
+    session.nextRank = view.nextRank;
+    session.onStep = handlers.onStep;
+  }
   fill(dialog, view, handlers);
 }
 
