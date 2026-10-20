@@ -1,14 +1,14 @@
 ---
 gsd_state_version: "1.0"
 status: executing
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-10-19T18:03:50.016Z"
-state_head: 708ceceec6ba99f8018c80a5f5bf60faf25a692a
+stopped_at: Plan 04-08 Tasks 1-2 done; awaiting Task 3 human walk-through (checkpoint)
+last_updated: "2026-10-20T04:49:28.183Z"
+state_head: 8e307b6f2e8eadfebc683d44a805473081980b03
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 16
-  completed_plans: 15
+  completed_plans: 16
   percent: 60
 current_phase: 4
 current_phase_name: Incident Console and Investigation Flow
@@ -29,10 +29,10 @@ current_phase_name: Incident Console and Investigation Flow
 ## Current Position
 
 - **Phase:** Phase 4 (Incident Console and Investigation Flow) in progress.
-- **Current Plan:** 7
+- **Current Plan:** 8 (Tasks 1-2 done; awaiting Task 3 human verification)
 - **Total Plans in Phase:** 8
 - **Progress:** 3/5 phases complete; Phase 4 plans 6/8 complete (04-07 next).
-- **Last action:** Completed 04-06: native modal suspect drawer with per-signal arithmetic, changed line ranges with stack-frame overlap, evidence with Show matching log lines, opened from the verdict, lineup and focusable top-three timeline markers.
+- **Last action:** Plan 04-08 Tasks 1-2 committed (own files: paste, pick, drop, 1 MiB pre-read gate, field-mapped errors, Clear inputs confirmation, README console notes). Task 3, the end-of-phase human walk-through, is pending.
 
 ## Decisions
 
@@ -57,6 +57,7 @@ current_phase_name: Incident Console and Investigation Flow
 - [Phase 04]: 04-06: top-three timeline markers are real buttons in a layer beside the aria-hidden SVG; Show matching log lines dismisses the drawer without focus return then sets the filter and opens signature log lines
 - [Phase 04]: 04-07: copy feedback resets on new result, drawer open/step/close; no timer; Hide Markdown returns focus to the copy button
 - [Phase 04]: 04-07: trust footer count chip counts warnings plus diagnostics; clean results show 'No warnings or diagnostics were reported.'
+- [Phase 04]: 04-08: own-file reads and the Clear inputs confirmation live in inputs.ts; app.ts holds only the draft and dispatches start/cleared
 
 ## Blockers
 
@@ -64,7 +65,7 @@ current_phase_name: Incident Console and Investigation Flow
 
 ## Next Action
 
-Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, verdict facts, lineup, commits considered).
+Plan 04-08 Task 3: user runs the end-of-phase walk-through (see 04-08-PLAN.md Task 3) and replies "approved", "approved with fonts" or lists issues; then finalize 04-08-SUMMARY.md, mark UX-01/UX-08/UX-09 complete and update the roadmap.
 
 ## Handoff Policy
 
@@ -75,9 +76,9 @@ Execute Plan 04-03: evidence-first verdict card and suspect lineup (format.ts, v
 
 ## Session Continuity
 
-**Last session:** 2026-10-19T18:03:49.768Z
-**Stopped at:** Completed 04-07-PLAN.md
-**Resume file:** None
+**Last session:** 2026-10-20T04:49:27.046Z
+**Stopped at:** Plan 04-08 Tasks 1-2 done; awaiting Task 3 human walk-through (checkpoint)
+**Resume file:** .planning/phases/04-incident-console-and-investigation-flow/04-08-SUMMARY.md
 
 - **Last session:** 2026-10-19 — Phase 2 implementation and verification completed.
 - **Stopped at:** Phase 2 is complete with documented limitations; Phase 3 planning is next.
