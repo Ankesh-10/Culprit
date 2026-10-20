@@ -13,6 +13,8 @@ import { dismissSuspectDrawer, openSuspectDrawer, updateSuspectDrawer } from './
 import type { DrawerHandlers } from './drawer';
 import { buildDrawerView } from './drawer-model';
 import { registerLocalFonts } from './fonts';
+import { playEntrance, resultSections } from './motion';
+import type { MotionScope } from './motion';
 import { initialCopyFeedback, initialPageState, reduceCopyFeedback, reducePage, scheduleLoadingBanner } from './state';
 import type { CopyEvent, CopyFeedback, PageEvent, PageState, Scheduler, SettledState } from './state';
 import { renderEmptyState, renderErrorState, renderLoadingPlaceholder, renderStatePanel, renderStatus } from './status';
@@ -74,6 +76,8 @@ export function mountApp(doc: Document): void {
   let cancelBanner: () => void = () => undefined;
   let loadedId: string | null = null;
   let hasResult = false;
+  let motionScope: MotionScope | null = null;
+  let enteredRequestId = -1;
 
   // Own-files path: the draft lives only in memory; a failed analysis never clears it.
   let draft: OwnInputDraft = emptyDraft();
@@ -324,6 +328,10 @@ export function mountApp(doc: Document): void {
 
     if (state.phase === 'loading' && previous.phase === 'loading') return;
 
+    // Every rebuilt body cancels pending motion: the old nodes are about to be replaced.
+    motionScope?.dispose();
+    motionScope = null;
+
     switch (state.phase) {
       case 'idle':
         disposeInvestigation();
@@ -344,6 +352,10 @@ export function mountApp(doc: Document): void {
         title.textContent = `Result: ${state.label}`;
         showBody(renderSettled(state));
         title.focus();
+        if (state.requestId !== enteredRequestId) {
+          enteredRequestId = state.requestId;
+          motionScope = playEntrance(resultSections(statusRegion, body));
+        }
         break;
       }
       case 'error': {

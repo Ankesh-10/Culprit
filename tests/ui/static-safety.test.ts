@@ -62,6 +62,11 @@ describe('static safety over src/ and index.html', () => {
     expect(offenders(files, /Date\.now|Math\.random|\bIntl\b|toLocale/)).toEqual([]);
   });
 
+  it('allows animation-frame APIs only in src/ui/motion.ts (D-15)', () => {
+    const frameApis = /requestAnimationFrame|cancelAnimationFrame|performance\.now/;
+    expect(offenders(srcFiles, frameApis)).toEqual(['src/ui/motion.ts']);
+  });
+
   it('adds no runtime dependency and keeps exactly the four dev dependencies', () => {
     const packageJson = JSON.parse(readFileSync(join(rootPath, 'package.json'), 'utf8')) as {
       dependencies?: unknown;

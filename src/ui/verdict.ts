@@ -45,14 +45,14 @@ function renderCaution(caution: NonNullable<VerdictView['caution']>): HTMLElemen
 function renderHeadline(view: VerdictView): HTMLElement {
   return view.headline.mode === 'suspect'
     ? el('div', { className: 'verdict-headline' }, [
-        el('p', { className: 'verdict-hash', text: view.headline.shortSha }),
+        el('p', { className: 'verdict-hash', text: view.headline.shortSha, attrs: { 'data-roll': 'decode' } }),
         el('p', { className: 'verdict-subject', text: view.headline.subject }),
       ])
     : el('div', { className: 'verdict-headline' }, [
         el('p', { className: 'verdict-no-clear', text: 'No clear culprit' }),
         el('div', { className: 'verdict-candidate' }, [
           el('p', { className: 'verdict-candidate-label', text: 'Leading candidate' }),
-          el('p', { className: 'verdict-hash', text: view.headline.shortSha }),
+          el('p', { className: 'verdict-hash', text: view.headline.shortSha, attrs: { 'data-roll': 'decode' } }),
           el('p', { className: 'verdict-subject', text: view.headline.subject }),
         ]),
       ]);
@@ -67,6 +67,7 @@ function renderFactValue(fact: VerdictFact): HTMLElement {
     }
     return el('dd', { className: classes }, lines);
   }
+  if (fact.key === 'matches') return el('dd', { className: classes, text: fact.value, attrs: { 'data-roll': 'count' } });
   return el('dd', { className: classes, text: fact.value });
 }
 
@@ -91,7 +92,7 @@ function renderScoreRow(view: VerdictView): HTMLElement {
     el('p', { className: 'score-label', text: 'Score' }),
     el('div', { className: 'score-line' }, [
       renderScoreMeter(view.score.fraction),
-      el('span', { className: 'score-value', text: view.score.text }),
+      el('span', { className: 'score-value', text: view.score.text, attrs: { 'data-roll': 'count' } }),
       el('span', { className: 'score-caption', text: SCORE_CAPTION }),
     ]),
     el('p', { className: 'score-helper', text: view.scoreHelper }),

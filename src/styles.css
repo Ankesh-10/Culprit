@@ -64,6 +64,14 @@
   --font-ui: Inter, Geist, "Segoe UI Variable Text", "Segoe UI Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
 
+  /* Motion tokens (POLISH-02 early). Script-side twins live in src/ui/motion-model.ts and a test pins them. */
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-enter: 600ms;
+  --motion-stagger: 80ms;
+  --motion-fast: 150ms;
+  --motion-draw: 900ms;
+  --motion-drawer: 320ms;
+
   color-scheme: dark;
 }
 
@@ -925,9 +933,11 @@ kbd {
 
 .score-fill {
   display: block;
-  width: calc(var(--fraction, 0) * 100%);
+  width: 100%;
   height: 100%;
   background: var(--color-ink-2);
+  transform: scaleX(var(--fraction, 0));
+  transform-origin: left center;
 }
 
 .score-value {
@@ -2132,4 +2142,59 @@ kbd {
   .drawer-nav-button:disabled { color: GrayText; border-color: GrayText; }
 
   .icon { forced-color-adjust: auto; color: CanvasText; }
+}
+
+/* Motion (POLISH-02 early, quick 261020-ftp)
+   One consolidated block. Everything that moves lives inside the no-preference media query, so the base
+   state (no query, no script, reduced motion) is already the final state. Only transform, opacity and
+   stroke-dashoffset are animated, fills are `backwards` so a finished animation releases the element, and
+   the sole loops are the loading spinner above and the ambient drift. */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes motion-rise {
+    from { opacity: 0; transform: translateY(12px); }
+  }
+
+  @keyframes motion-fill {
+    from { transform: scaleX(0); }
+  }
+
+  @keyframes motion-fade {
+    from { opacity: 0; }
+  }
+
+  .motion-enter {
+    animation: motion-rise var(--motion-enter) var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger));
+  }
+
+  .motion-enter .score-fill,
+  .motion-enter .meter-segment.is-filled {
+    transform-origin: left center;
+    animation: motion-fill var(--motion-enter) var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 200ms);
+  }
+
+  .motion-enter .meter-segment.is-filled:nth-child(2) {
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 280ms);
+  }
+
+  .motion-enter .meter-segment.is-filled:nth-child(3) {
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 360ms);
+  }
+
+  /* The decode and count-up run on an aria-hidden overlay; the real text keeps its place and is only
+     made transparent while the overlay is up, so it is never missing or wrong for assistive technology. */
+  .is-rolling {
+    position: relative;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .is-rolling > .roll-ghost {
+    position: absolute;
+    inset: 0;
+    -webkit-text-fill-color: currentColor;
+    white-space: nowrap;
+    pointer-events: none;
+  }
 }

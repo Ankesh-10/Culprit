@@ -184,10 +184,6 @@ describe('Raycast design rules', () => {
     for (const shadow of shadows) expect(shadow.startsWith('inset')).toBe(true);
   });
 
-  it('declares no transition: motion stays gated to POLISH-02 (D-04)', () => {
-    expect(css).not.toContain('transition');
-  });
-
   it('uses font weights 400 and 500 only (D-03)', () => {
     const weights = [...css.matchAll(/font-weight\s*:\s*([^;]+);/g)].map((match) => (match[1] ?? '').trim());
     const allowed = ['var(--weight-regular)', 'var(--weight-medium)', '400', '500'];
@@ -227,5 +223,184 @@ describe('Raycast design rules', () => {
     const block = /\.button-primary\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
     expect(block).toMatch(/background\s*:\s*var\(--color-primary\)/);
     expect(block).toMatch(/color\s*:\s*var\(--color-on-primary\)/);
+  });
+});
+
+/** Index of the brace that closes the one opened at `openIndex`, or -1. */
+function matchingBrace(text: string, openIndex: number): number {
+  let depth = 0;
+  for (let i = openIndex; i < text.length; i += 1) {
+    if (text[i] === '{') depth += 1;
+    else if (text[i] === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/** Splits on commas or whitespace that sit outside parentheses. */
+function splitTopLevel(value: string, separator: ',' | ' '): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const character of value) {
+    if (character === '(') depth += 1;
+    if (character === ')') depth -= 1;
+    const isSeparator = depth === 0 && (separator === ',' ? character === ',' : /\s/.test(character));
+    if (isSeparator) {
+      if (current.trim() !== '') parts.push(current.trim());
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  if (current.trim() !== '') parts.push(current.trim());
+  return parts;
+}
+
+const MOTION_PROPERTIES = ['transform', 'opacity', 'stroke-dashoffset'];
+const MOTION_LOOPS = ['culprit-spin', 'motion-drift'];
+const ANIMATION_KEYWORDS = [
+  'ease',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+  'linear',
+  'step-start',
+  'step-end',
+  'normal',
+  'reverse',
+  'alternate',
+  'alternate-reverse',
+  'none',
+  'backwards',
+  'running',
+  'paused',
+];
+
+/**
+ * Every way the stylesheet may break the motion rules (D-09, D-10, D-12), as readable messages.
+ * Motion lives only inside `@media (prefers-reduced-motion: no-preference)`, keyframes animate only
+ * transform, opacity and stroke-dashoffset, and the only loops are the loading spinner and the ambient drift.
+ */
+function motionViolations(cssText: string): string[] {
+  const text = cssText.replace(/\/\*[\s\S]*?\*\//g, '');
+  const problems: string[] = [];
+
+  let gated = '';
+  let ungated = '';
+  let cursor = 0;
+  const mediaStart = /@media([^{]*)\{/g;
+  for (;;) {
+    mediaStart.lastIndex = cursor;
+    const found = mediaStart.exec(text);
+    if (found === null) break;
+    const open = found.index + found[0].length - 1;
+    const close = matchingBrace(text, open);
+    if (close === -1) break;
+    if ((found[1] ?? '').includes('prefers-reduced-motion: no-preference')) {
+      ungated += text.slice(cursor, found.index);
+      gated += `${text.slice(open + 1, close)}\n`;
+      cursor = close + 1;
+    } else {
+      // A plain @media block stays ungated text; step inside it so a nested gated block is still found.
+      ungated += text.slice(cursor, open + 1);
+      cursor = open + 1;
+    }
+  }
+  ungated += text.slice(cursor);
+
+  for (const word of ['transition', 'animation', 'will-change', '@keyframes']) {
+    if (ungated.includes(word)) problems.push(`ungated "${word}"`);
+  }
+
+  const defined = new Set<string>();
+  const keyframes = /@keyframes\s+([\w-]+)\s*\{/g;
+  for (let found = keyframes.exec(gated); found !== null; found = keyframes.exec(gated)) {
+    const name = found[1] ?? '';
+    defined.add(name);
+    const open = found.index + found[0].length - 1;
+    const body = gated.slice(open + 1, matchingBrace(gated, open));
+    for (const declaration of body.matchAll(/([a-zA-Z-]+)\s*:/g)) {
+      const property = declaration[1] ?? '';
+      if (!MOTION_PROPERTIES.includes(property)) problems.push(`keyframes ${name} animate ${property}`);
+    }
+  }
+
+  const declarations = /(?:^|[;{}\s])(transition-property|transition|animation-fill-mode|animation-iteration-count|animation-name|animation)\s*:\s*([^;}]+)/g;
+  for (const declaration of gated.matchAll(declarations)) {
+    const property = declaration[1] ?? '';
+    const value = (declaration[2] ?? '').trim();
+    if (property === 'transition' || property === 'transition-property') {
+      for (const item of splitTopLevel(value, ',')) {
+        const first = splitTopLevel(item, ' ')[0] ?? '';
+        if (!MOTION_PROPERTIES.includes(first)) problems.push(`transition of "${first}"`);
+      }
+    } else if (property === 'animation-fill-mode') {
+      if (/\b(forwards|both)\b/.test(value)) problems.push(`fill mode "${value}"`);
+    } else if (property === 'animation-iteration-count') {
+      if (value.includes('infinite')) problems.push('infinite iteration count');
+    } else {
+      for (const item of splitTopLevel(value, ',')) {
+        const tokens = splitTopLevel(item, ' ');
+        const names = tokens.filter(
+          (token) =>
+            /^[a-z][\w-]*$/.test(token) &&
+            !ANIMATION_KEYWORDS.includes(token) &&
+            token !== 'infinite' &&
+            token !== 'forwards' &&
+            token !== 'both',
+        );
+        for (const name of names) if (!defined.has(name)) problems.push(`animation uses undefined keyframes "${name}"`);
+        if (tokens.includes('forwards') || tokens.includes('both')) problems.push(`fill mode in "${item}"`);
+        if (tokens.includes('infinite') && !names.some((name) => MOTION_LOOPS.includes(name))) problems.push(`infinite loop in "${item}"`);
+      }
+    }
+  }
+
+  return problems;
+}
+
+describe('gated motion (D-09, D-10, D-12)', () => {
+  const GATE = '@media (prefers-reduced-motion: no-preference)';
+
+  it('ships a stylesheet with no motion violations', () => {
+    expect(motionViolations(css)).toEqual([]);
+  });
+
+  it('actually contains gated motion, so the check above is not vacuous', () => {
+    expect(css).toContain('prefers-reduced-motion: no-preference');
+    expect(css).toContain('@keyframes motion-rise');
+  });
+
+  it.each<[string, string]>([
+    ['an ungated transition', '.a { transition: opacity 200ms; }'],
+    ['an ungated animation', '.a { animation: spin 1s; }'],
+    ['ungated keyframes', '@keyframes spin { to { transform: rotate(1turn); } }'],
+    ['ungated will-change', '.a { will-change: transform; }'],
+    ['gated keyframes animating width', `${GATE} { @keyframes grow { from { width: 0; } } .a { animation: grow 1s; } }`],
+    ['a gated transition on all', `${GATE} { .a { transition: all 200ms; } }`],
+    ['a gated transition on background-color', `${GATE} { .a { transition: background-color 200ms; } }`],
+    ['a gated infinite loop on an unknown name', `${GATE} { @keyframes wobble { to { transform: scale(2); } } .a { animation: wobble 1s infinite; } }`],
+    ['a gated forwards fill', `${GATE} { @keyframes fade { from { opacity: 0; } } .a { animation: fade 1s forwards; } }`],
+    ['a gated both fill', `${GATE} { @keyframes fade { from { opacity: 0; } } .a { animation: fade 1s both; } }`],
+    ['a gated fill-mode declaration', `${GATE} { .a { animation-fill-mode: forwards; } }`],
+    ['a gated animation of unknown keyframes', `${GATE} { .a { animation: missing 1s; } }`],
+  ])('flags %s', (_label, snippet) => {
+    expect(motionViolations(snippet).length).toBeGreaterThan(0);
+  });
+
+  it('accepts a clean gated snippet and the two allowed loops', () => {
+    const clean = `${GATE} {
+      @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+      @keyframes draw { from { stroke-dashoffset: 1; } }
+      @keyframes motion-drift { to { transform: translate(24px, 24px); } }
+      .a { animation: rise var(--motion-enter) var(--motion-ease-out) backwards; animation-delay: calc(var(--index, 0) * var(--motion-stagger)); }
+      .b { animation: draw 900ms ease-in-out 3; }
+      .c { animation: motion-drift 48s linear infinite; }
+      .d { transition: opacity 150ms, transform 150ms; }
+    }`;
+    expect(motionViolations(clean)).toEqual([]);
   });
 });
