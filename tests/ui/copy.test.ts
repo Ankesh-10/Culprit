@@ -18,9 +18,9 @@ function analyzeBundled(id: string): AnalysisStream {
 }
 
 const CASES: Array<{ id: string; lines: number }> = [
-  { id: 'checkout-outage', lines: 70 },
-  { id: 'slow-burn', lines: 79 },
-  { id: 'ambiguous', lines: 79 },
+  { id: 'checkout-outage', lines: 71 },
+  { id: 'slow-burn', lines: 80 },
+  { id: 'ambiguous', lines: 80 },
 ];
 
 describe('buildPostmortemMarkdown (UI-SPEC Verification Hook 6)', () => {

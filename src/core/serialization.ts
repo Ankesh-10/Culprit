@@ -307,7 +307,7 @@ export function serializeMarkdown(result: AnalysisResult): string {
     `## Top suspects\n${suspectLines.join('\n')}`,
     `## Evidence\n${evidenceLines.length === 0 ? '- No suspect evidence recorded.' : evidenceLines.join('\n')}`,
     `## Confidence and caveats\n${caveatLines.join('\n')}`,
-    `## Provenance\n- Logs: ${inlineCode(canonical.provenance.logSource)} (${canonical.provenance.logFormat}, ${canonical.provenance.eventCount} events)\n- History: ${inlineCode(canonical.provenance.historySource)} (${canonical.provenance.historyFormat}, ${canonical.provenance.commitCount} commits)\n- Analysis: ${canonical.analysisVersion}; scoring: ${canonical.scoringVersion}; schema: ${canonical.schemaVersion}`,
+    `## Provenance\n- Logs: ${inlineCode(canonical.provenance.logSource)} (${canonical.provenance.logFormat}, ${canonical.provenance.eventCount} events)\n- History: ${inlineCode(canonical.provenance.historySource)} (${canonical.provenance.historyFormat}, ${canonical.provenance.commitCount} commits)\n- Analysis: ${canonical.analysisVersion}; scoring: ${canonical.scoringVersion}; schema: ${canonical.schemaVersion}\n- Limits: ${canonical.limits.maxLogBytes} bytes of log text, ${canonical.limits.maxEvents} events, ${canonical.limits.maxStackLines} stack lines per event; input truncated: ${canonical.limits.truncated ? 'yes' : 'no'}`,
     `## UTC disclosure\nAll timestamps in this report are normalized to UTC and rendered with an explicit \`Z\` suffix. The result contains no wall-clock generation time.`,
     `## Warnings and diagnostics\n${warningLines.length === 0 ? '- None.' : warningLines.join('\n')}`,
   ];

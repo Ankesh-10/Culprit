@@ -123,6 +123,19 @@ describe('deterministic serialization', () => {
     expect(markdown).toContain('All timestamps in this report are normalized to UTC');
     expect(markdown).toContain('Strong trace evidence, but correlation is not causality.');
   });
+
+  it('states the input limits in the Provenance section right after the Analysis line', () => {
+    const lines = serializeMarkdown(makeResult()).split('\n');
+    const analysisIndex = lines.findIndex((line) => line.startsWith('- Analysis: '));
+    expect(analysisIndex).toBeGreaterThan(-1);
+    expect(lines[analysisIndex + 1]).toBe('- Limits: 1000000 bytes of log text, 10000 events, 50 stack lines per event; input truncated: no');
+  });
+
+  it('flags truncated input in the Limits line', () => {
+    const result = makeResult();
+    result.limits = { ...result.limits, truncated: true };
+    expect(serializeMarkdown(result)).toContain('- Limits: 1000000 bytes of log text, 10000 events, 50 stack lines per event; input truncated: yes');
+  });
 });
 
 function checkoutResult(): AnalysisResult {
