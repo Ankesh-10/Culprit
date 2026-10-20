@@ -4,6 +4,16 @@ import { describe, expect, it } from 'vitest';
 const css = readFileSync(new URL('../../src/styles.css', import.meta.url), 'utf8');
 const rootBlock = /:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
 
+/** The css with block comments removed, so an explanatory comment cannot confuse a structure check. */
+const bareCss = css.replace(/\/\*[\s\S]*?\*\//g, '');
+const LIGHT_QUERY = '@media (prefers-color-scheme: light)';
+const lightQueryStart = bareCss.indexOf(LIGHT_QUERY);
+const lightQueryOpen = bareCss.indexOf('{', lightQueryStart);
+const lightQueryClose = lightQueryStart === -1 ? -1 : matchingBrace(bareCss, lightQueryOpen);
+/** Body of the `:root` rule inside the `prefers-color-scheme: light` block. */
+const lightBlock =
+  lightQueryStart === -1 ? '' : (/:root\s*\{([^}]*)\}/.exec(bareCss.slice(lightQueryOpen + 1, lightQueryClose))?.[1] ?? '');
+
 /** The UI-SPEC hex contract (Raycast dark system). */
 const SPEC: Record<string, string> = {
   'color-page': '#07080a',
@@ -34,24 +44,24 @@ const SPEC: Record<string, string> = {
   'stripe-3': '#a1131a',
 };
 
-function token(name: string): string | undefined {
+function token(name: string, block: string = rootBlock): string | undefined {
   // Name-exact: the lookbehind stops "--color-ink" from matching inside "--color-ink-2".
-  const match = new RegExp(`(?<![\\w-])--${name}\\s*:\\s*(#[0-9a-fA-F]{6})\\s*;`).exec(rootBlock);
+  const match = new RegExp(`(?<![\\w-])--${name}\\s*:\\s*(#[0-9a-fA-F]{6})\\s*;`).exec(block);
   return match?.[1]?.toLowerCase();
 }
 
-function value(name: string): string {
-  const found = token(name);
-  if (found === undefined) throw new Error(`--${name} is missing from :root in src/styles.css`);
+function value(name: string, block: string = rootBlock): string {
+  const found = token(name, block);
+  if (found === undefined) throw new Error(`--${name} is missing from the token block in src/styles.css`);
   return found;
 }
 
-/** Reads a `--name: rgba(r, g, b, a);` declaration from the :root block. */
-function rgbaToken(name: string): [number, number, number, number] {
+/** Reads a `--name: rgba(r, g, b, a);` declaration from a token block (the base :root by default). */
+function rgbaToken(name: string, block: string = rootBlock): [number, number, number, number] {
   const match = new RegExp(
     `(?<![\\w-])--${name}\\s*:\\s*rgba\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)\\s*,\\s*([0-9.]+)\\s*\\)\\s*;`,
-  ).exec(rootBlock);
-  if (match === null) throw new Error(`--${name} is missing from :root in src/styles.css`);
+  ).exec(block);
+  if (match === null) throw new Error(`--${name} is missing from the token block in src/styles.css`);
   return [Number(match[1]), Number(match[2]), Number(match[3]), Number(match[4])];
 }
 
@@ -172,7 +182,9 @@ describe('WCAG contrast of the shipped tokens', () => {
 });
 
 describe('Raycast design rules', () => {
-  const afterRoot = css.slice(css.indexOf('}', css.indexOf(':root')) + 1);
+  // Everything after the base token block, minus the light token rule (hex values belong only in the two token blocks).
+  const afterBase = bareCss.slice(bareCss.indexOf('}', bareCss.indexOf(':root')) + 1);
+  const afterRoot = afterBase.replace(/:root\s*\{[^}]*\}/, '');
 
   it('uses no gradient anywhere (D-04)', () => {
     expect(css).not.toMatch(/gradient\(/);
@@ -486,5 +498,241 @@ describe('landing colour pairs (quick 261020-gzd)', () => {
   it('keeps the selected tab (ink on the raised surface) and its border readable', () => {
     expect(ratio(value('color-ink'), value('color-raised'))).toBeGreaterThanOrEqual(4.5);
     expect(ratio(value('color-control-border'), value('color-page'))).toBeGreaterThanOrEqual(3);
+  });
+});
+
+/** The light token set (POLISH-01): one `prefers-color-scheme: light` override of the same custom properties. */
+const LIGHT_SPEC: Record<string, string> = {
+  'color-page': '#f5f5f6',
+  'color-surface': '#ffffff',
+  'color-elevated': '#fafafa',
+  'color-raised': '#f0f0f1',
+  'color-ink': '#111113',
+  'color-ink-2': '#3b3b3f',
+  'color-muted': '#5f5f64',
+  'color-border': '#e2e2e5',
+  'color-control-border': '#77777d',
+  'color-grid': '#e2e2e5',
+  'color-axis': '#b9b9be',
+  'color-primary': '#111113',
+  'color-primary-pressed': '#2b2b2f',
+  'color-on-primary': '#ffffff',
+  'color-focus': '#0a66c2',
+  'color-good': '#147a45',
+  'color-warning': '#8a5800',
+  'color-serious': '#a8441a',
+  'color-critical': '#c4262e',
+  'viz-series-errors': '#2a6fd0',
+  'viz-onset': '#c4501c',
+  'viz-suspect': '#0f7f57',
+  'viz-context': '#66758c',
+  'stripe-1': '#ff5757',
+  'stripe-2': '#e04848',
+  'stripe-3': '#a1131a',
+};
+
+describe('light theme tokens (POLISH-01)', () => {
+  const lv = (name: string): string => value(name, lightBlock);
+  const L_BACKGROUNDS = ['color-page', 'color-surface', 'color-elevated', 'color-raised'] as const;
+
+  function lightNumber(name: string): number {
+    const match = new RegExp(`(?<![\\w-])--${name}\\s*:\\s*([0-9.]+)\\s*;`).exec(lightBlock);
+    if (match === null) throw new Error(`--${name} is missing from the light block`);
+    return Number(match[1]);
+  }
+
+  it('has a light block, so the checks below are not vacuous', () => {
+    expect(lightBlock).not.toBe('');
+  });
+
+  it.each(Object.entries(LIGHT_SPEC))('light --%s equals the pinned value %s', (name, hex) => {
+    expect(token(name, lightBlock)).toBe(hex);
+  });
+
+  it('pins the light rgba, stripe-opacity and ambient tokens', () => {
+    expect(rgbaToken('color-hairline-strong', lightBlock)).toEqual([0, 0, 0, 0.12]);
+    expect(rgbaToken('color-warning-soft', lightBlock)).toEqual([138, 88, 0, 0.1]);
+    expect(lightNumber('stripe-1-opacity')).toBe(0.12);
+    expect(lightNumber('stripe-2-opacity')).toBe(0.1);
+    expect(lightNumber('stripe-3-opacity')).toBe(0.08);
+    expect(lightNumber('ambient-opacity')).toBe(0.04);
+  });
+
+  it('keeps every light text colour at 4.5:1 or better on the four light surfaces', () => {
+    const failures: string[] = [];
+    for (const foreground of ['color-ink', 'color-ink-2', 'color-muted']) {
+      for (const background of L_BACKGROUNDS) {
+        const result = ratio(lv(foreground), lv(background));
+        if (result < 4.5) failures.push(`${foreground} on ${background}: ${round2(result)}`);
+      }
+    }
+    for (const background of ['color-primary', 'color-primary-pressed']) {
+      const onPrimary = ratio(lv('color-on-primary'), lv(background));
+      if (onPrimary < 4.5) failures.push(`color-on-primary on ${background}: ${round2(onPrimary)}`);
+    }
+    const soft = rgbaToken('color-warning-soft', lightBlock);
+    for (const background of ['color-surface', 'color-raised']) {
+      const result = ratio(lv('color-warning'), composite(soft, lv(background)));
+      if (result < 4.5) failures.push(`color-warning on warning-soft over ${background}: ${round2(result)}`);
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('keeps light focus, control border, status colours and chart marks at 3:1 or better', () => {
+    const failures: string[] = [];
+    for (const foreground of ['color-focus', 'color-control-border', 'color-good', 'color-warning', 'color-serious', 'color-critical']) {
+      for (const background of L_BACKGROUNDS) {
+        const result = ratio(lv(foreground), lv(background));
+        if (result < 3) failures.push(`${foreground} on ${background}: ${round2(result)}`);
+      }
+    }
+    for (const foreground of ['viz-series-errors', 'viz-onset', 'viz-suspect', 'viz-context']) {
+      for (const background of ['color-page', 'color-surface']) {
+        const result = ratio(lv(foreground), lv(background));
+        if (result < 3) failures.push(`${foreground} on ${background}: ${round2(result)}`);
+      }
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('matches the light figures recorded in the UI-SPEC', () => {
+    const worst = (foreground: string): number =>
+      round2(Math.min(...L_BACKGROUNDS.map((background) => ratio(lv(foreground), lv(background)))));
+    expect(worst('color-ink')).toBe(16.56);
+    expect(worst('color-ink-2')).toBe(9.79);
+    expect(worst('color-muted')).toBe(5.58);
+    expect(round2(ratio(lv('color-muted'), lv('color-surface')))).toBe(6.35);
+    expect(worst('color-focus')).toBe(4.99);
+    expect(worst('color-control-border')).toBe(3.91);
+    expect(round2(ratio(lv('color-control-border'), lv('color-page')))).toBe(4.08);
+    expect(worst('color-good')).toBe(4.73);
+    expect(worst('color-warning')).toBe(5.3);
+    expect(worst('color-serious')).toBe(5.26);
+    expect(worst('color-critical')).toBe(5.03);
+    const marks: Array<[string, number, number]> = [
+      ['viz-series-errors', 4.5, 4.9],
+      ['viz-onset', 4.27, 4.65],
+      ['viz-suspect', 4.6, 5.01],
+      ['viz-context', 4.29, 4.68],
+    ];
+    for (const [mark, onPage, onSurface] of marks) {
+      expect(round2(ratio(lv(mark), lv('color-page')))).toBe(onPage);
+      expect(round2(ratio(lv(mark), lv('color-surface')))).toBe(onSurface);
+    }
+    expect(round2(ratio(lv('color-on-primary'), lv('color-primary')))).toBe(18.86);
+    expect(round2(ratio(lv('color-on-primary'), lv('color-primary-pressed')))).toBe(14.1);
+    expect(round2(ratio(lv('color-focus'), lv('color-ink')))).toBe(3.32);
+    const soft = rgbaToken('color-warning-soft', lightBlock);
+    expect(round2(ratio(lv('color-warning'), composite(soft, lv('color-surface'))))).toBe(5.23);
+    expect(round2(ratio(lv('color-warning'), composite(soft, lv('color-raised'))))).toBe(4.64);
+  });
+
+  describe('decorative layers', () => {
+    const stripes = ['stripe-1', 'stripe-2', 'stripe-3'] as const;
+    const rgb = (hex: string): [number, number, number] => [
+      Number.parseInt(hex.slice(1, 3), 16),
+      Number.parseInt(hex.slice(3, 5), 16),
+      Number.parseInt(hex.slice(5, 7), 16),
+    ];
+    const page = lv('color-page');
+    const [inkR, inkG, inkB] = rgb(lv('color-ink'));
+    const dot = composite([inkR, inkG, inkB, lightNumber('ambient-opacity')], page);
+
+    function over(stripe: (typeof stripes)[number], background: string): string {
+      const [r, g, b] = rgb(lv(stripe));
+      return composite([r, g, b, lightNumber(`${stripe}-opacity`)], background);
+    }
+
+    it('keeps every light stripe at 0.5 opacity or less and the ambient grid at 0.04 or less', () => {
+      for (const stripe of stripes) expect(lightNumber(`${stripe}-opacity`)).toBeLessThanOrEqual(0.5);
+      expect(lightNumber('ambient-opacity')).toBeLessThanOrEqual(0.04);
+    });
+
+    it('keeps ink, ink-2 and muted at 4.5:1 or better over each stripe, over each stripe on a dot and over the dot', () => {
+      const failures: string[] = [];
+      for (const foreground of ['color-ink', 'color-ink-2', 'color-muted']) {
+        const surfaces: Array<[string, string]> = [['the ambient dot', dot]];
+        for (const stripe of stripes) {
+          surfaces.push([`${stripe} over page`, over(stripe, page)], [`${stripe} over a dot`, over(stripe, dot)]);
+        }
+        for (const [label, background] of surfaces) {
+          const result = ratio(lv(foreground), background);
+          if (result < 4.5) failures.push(`${foreground} on ${label}: ${round2(result)}`);
+        }
+      }
+      expect(failures).toEqual([]);
+    });
+
+    it('records the light muted-text figures quoted in the UI-SPEC', () => {
+      expect(stripes.map((stripe) => round2(ratio(lv('color-muted'), over(stripe, page))))).toEqual([5.11, 5.15, 5.06]);
+      expect(stripes.map((stripe) => round2(ratio(lv('color-muted'), over(stripe, dot))))).toEqual([4.74, 4.78, 4.7]);
+      expect(round2(ratio(lv('color-muted'), dot))).toBe(5.38);
+    });
+  });
+
+  it('keeps the landing pairs readable in light', () => {
+    expect(round2(ratio(lv('color-ink-2'), lv('color-grid')))).toBe(8.63);
+    const failures: string[] = [];
+    for (const foreground of ['color-muted', 'color-ink-2', 'color-ink']) {
+      for (const background of ['color-page', 'color-surface']) {
+        const result = ratio(lv(foreground), lv(background));
+        if (result < 4.5) failures.push(`${foreground} on ${background}: ${round2(result)}`);
+      }
+    }
+    expect(failures).toEqual([]);
+    expect(ratio(lv('color-ink'), lv('color-raised'))).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(lv('color-control-border'), lv('color-page'))).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('light theme structure (POLISH-01)', () => {
+  const queries = [...bareCss.matchAll(/@media\s*\(\s*prefers-color-scheme/g)];
+  const baseNames = [...rootBlock.matchAll(/(?<![\w-])(--(?:color-|viz-|stripe-)[\w-]*|--ambient-opacity)\s*:/g)].map(
+    (match) => match[1] ?? '',
+  );
+
+  it('contains exactly one prefers-color-scheme at-rule, and it is light', () => {
+    expect(queries).toHaveLength(1);
+    expect(bareCss).toContain(LIGHT_QUERY);
+  });
+
+  it('places the light block directly after the base :root and before any component rule', () => {
+    const baseClose = bareCss.indexOf('}', bareCss.indexOf(':root'));
+    expect(baseClose).toBeGreaterThan(-1);
+    expect(bareCss.slice(baseClose + 1, lightQueryStart).trim()).toBe('');
+    const afterLight = bareCss.slice(lightQueryClose + 1).trim();
+    expect(afterLight.startsWith('* {') || afterLight.startsWith('*{')).toBe(true);
+  });
+
+  it('redefines every colour, viz, stripe and ambient token of the base block in the light block', () => {
+    expect(baseNames.length).toBeGreaterThan(20);
+    const missing = baseNames.filter((name) => !new RegExp(`(?<![\\w-])${name}\\s*:`).test(lightBlock));
+    expect(missing).toEqual([]);
+  });
+
+  it('declares color-scheme light in the light block and dark in the base block', () => {
+    expect(lightBlock).toMatch(/color-scheme\s*:\s*light\s*;/);
+    expect(rootBlock).toMatch(/color-scheme\s*:\s*dark\s*;/);
+  });
+
+  it('keeps the base block on the dark values (no light value leaks into the default)', () => {
+    for (const [name, hex] of Object.entries(SPEC)) expect(token(name)).toBe(hex);
+  });
+
+  it('keeps the light block free of any non-token declaration', () => {
+    const declared = [...lightBlock.matchAll(/(?<![\w-])(--[\w-]+|color-scheme)\s*:/g)].map((match) => match[1] ?? '');
+    for (const name of declared) {
+      expect(name === 'color-scheme' || /^--(color-|viz-|stripe-|ambient-opacity)/.test(name)).toBe(true);
+    }
+  });
+});
+
+describe('index.html colour-scheme metas (POLISH-01)', () => {
+  const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+
+  it('declares both schemes and a media-qualified theme-color for each', () => {
+    expect(html).toContain('content="dark light"');
+    expect(html).toMatch(/<meta\s+name="theme-color"\s+content="#07080a"\s+media="\(prefers-color-scheme: dark\)"\s*\/>/);
+    expect(html).toMatch(/<meta\s+name="theme-color"\s+content="#f5f5f6"\s+media="\(prefers-color-scheme: light\)"\s*\/>/);
   });
 });
