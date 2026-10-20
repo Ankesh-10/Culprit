@@ -42,7 +42,7 @@ docker build --tag culprit:phase1 .
 docker run --rm --publish 4173:4173 culprit:phase1
 ```
 
-Then open http://localhost:4173. The image serves the static build as a non-root user with a strict Content-Security-Policy (`connect-src 'none'`).
+Then open http://localhost:4173. The image serves the static build as a non-root user with a strict Content-Security-Policy (`connect-src 'none'`); `npm run preview` sends the same headers.
 
 ## Using the console
 
