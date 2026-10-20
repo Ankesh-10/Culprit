@@ -59,16 +59,24 @@ describe('patternChip', () => {
 });
 
 describe('fontFacesFromGlob', () => {
-  it('maps the two expected files to their families, Geist first, and ignores others', () => {
+  it('maps the expected files to their families, Inter first, and ignores others', () => {
     expect(
       fontFacesFromGlob({
         '../assets/fonts/GeistMono-Variable.woff2': 'b.woff2',
-        '../assets/fonts/Geist-Variable.woff2': 'a.woff2',
+        '../assets/fonts/Inter-Variable.woff2': 'i.woff2',
         '../assets/fonts/Other.woff2': 'c.woff2',
+        '../assets/fonts/Geist-Variable.woff2': 'a.woff2',
       }),
     ).toEqual([
+      { family: 'Inter', url: 'i.woff2' },
       { family: 'Geist', url: 'a.woff2' },
       { family: 'Geist Mono', url: 'b.woff2' },
+    ]);
+  });
+
+  it('maps a lone Inter file to just Inter', () => {
+    expect(fontFacesFromGlob({ '../assets/fonts/Inter-Variable.woff2': 'i.woff2' })).toEqual([
+      { family: 'Inter', url: 'i.woff2' },
     ]);
   });
 
@@ -80,8 +88,10 @@ describe('fontFacesFromGlob', () => {
 describe('bundled font licence', () => {
   const woff2 = existsSync(fontsDirectory) ? readdirSync(fontsDirectory).filter((name) => name.endsWith('.woff2')) : [];
 
-  it('only ever ships the two expected files, with the OFL text beside them', () => {
-    for (const name of woff2) expect(['Geist-Variable.woff2', 'GeistMono-Variable.woff2']).toContain(name);
+  it('only ever ships the three expected files, with the OFL text beside them', () => {
+    for (const name of woff2) {
+      expect(['Inter-Variable.woff2', 'Geist-Variable.woff2', 'GeistMono-Variable.woff2']).toContain(name);
+    }
     if (woff2.length > 0) expect(existsSync(new URL('OFL.txt', fontsDirectory))).toBe(true);
   });
 

@@ -1,11 +1,12 @@
 /// <reference types="vite/client" />
 
 export interface FontFaceSpec {
-  family: 'Geist' | 'Geist Mono';
+  family: 'Inter' | 'Geist' | 'Geist Mono';
   url: string;
 }
 
 const EXPECTED_FILES: ReadonlyArray<{ file: string; family: FontFaceSpec['family'] }> = [
+  { file: 'Inter-Variable.woff2', family: 'Inter' },
   { file: 'Geist-Variable.woff2', family: 'Geist' },
   { file: 'GeistMono-Variable.woff2', family: 'Geist Mono' },
 ];
@@ -14,7 +15,7 @@ function baseName(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1);
 }
 
-/** Maps the bundled font files to their families, Geist first. Any other file is ignored. */
+/** Maps the bundled font files to their families, Inter first. Any other file is ignored. */
 export function fontFacesFromGlob(record: Record<string, string>): FontFaceSpec[] {
   const faces: FontFaceSpec[] = [];
   for (const { file, family } of EXPECTED_FILES) {
@@ -28,7 +29,7 @@ export function fontFacesFromGlob(record: Record<string, string>): FontFaceSpec[
 }
 
 /**
- * Registers the locally bundled Geist files, if present. The URLs come from the build's own asset
+ * Registers the locally bundled Inter and Geist files, if present. The URLs come from the build's own asset
  * graph, so nothing is requested from another origin. With no files the system stacks stay in effect.
  */
 export function registerLocalFonts(): void {

@@ -130,4 +130,4 @@ Ranking limits:
 - History size is not capped yet.
 - Timelines over 10,000 buckets are rejected with an input-limit error.
 
-Font note: the UI ships with system font stacks. To use Geist instead, add the Geist WOFF2 files and `OFL.txt` under `src/assets/fonts` (see `FONTS.md` in that folder); the build bundles them locally and never loads fonts from a network.
+Font note: the UI ships with system font stacks (Segoe UI Variable or the platform UI face for text, a monospace stack for hashes, paths and log lines). To use Inter (preferred), Geist or Geist Mono instead, add the matching WOFF2 files (`Inter-Variable.woff2`, `Geist-Variable.woff2`, `GeistMono-Variable.woff2`) and `OFL.txt` under `src/assets/fonts` (see `FONTS.md` in that folder); the build bundles them locally and never loads fonts from a network.
