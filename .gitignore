@@ -4,3 +4,9 @@ dist/
 .DS_Store
 .opencode/
 .planning/milestone.lock
+
+# Local planning and tooling (not part of the application)
+.planning/
+.claude/
+commit-phase*.sh
+*.pdf
