@@ -52,18 +52,7 @@ After `npm run build`, `node scripts/serve-dist.mjs --smoke` starts the producti
 
 The committed workflow `.github/workflows/ci.yml` repeats the rebuild on Linux on every push: it reads the Node version from `.nvmrc`, runs `npm ci` and `make test`, runs the smoke check, builds the Docker image, starts the container, probes it, and runs the same smoke check inside the image. On a Windows host without `make`, the equivalent of `make test` is `npm run typecheck && npm test && npm run build`.
 
-Two optional real-browser checks need a local Chrome or Edge and are not part of `make test`. Run each from the repository root after `npm run build`; both print `PASS`, `WARN` and `FAIL` lines and end with `RESULT PASS` or `RESULT FAIL (n)`:
-
-```sh
-node .planning/phases/05-hardening-and-conditional-polish/05-render-check.mjs
-node .planning/quick/261020-gzd-landing-page-with-feature-tabs-and-scrol/261020-gzd-render-check.mjs
-```
-
-The first serves `dist/` through `scripts/serve-dist.mjs` (the same server and policy the Docker image runs), profiles a near-cap incident, sweeps keyboard, focus, reduced-motion, forced-colours and width behaviour, and rehearses the three bundled incidents from a clean browser profile at 1280x720 and 360x740, checking the verdict, the caution labels, the trust footer and the copied Markdown with no console error and no off-origin request. The second checks the landing page.
-
 `.gitattributes` pins LF line endings for every text file, so a clean clone on any platform (including Windows with `core.autocrlf`) reproduces byte-identical fixture outputs.
-
-Docker and `make` were not available on the development host (Windows, Node 24 against the pinned Node 22), so the image build is proven by the CI run, not by a local build.
 
 ## Docker
 
