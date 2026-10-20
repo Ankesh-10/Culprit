@@ -1,7 +1,8 @@
-// Phase 5 real-browser check: near-cap profile and the accessibility sweep (plan 05-02).
+// Phase 5 real-browser check: near-cap profile and the accessibility sweep (plan 05-02), and the three-case
+// demo rehearsal (plan 05-03).
 //
 // Run from the repository root after `npm run build`:
-//   node .planning/phases/05-hardening-and-conditional-polish/05-render-check.mjs [--sections profile,a11y] [--out <dir>] [--chrome <path>] [--server preview]
+//   node .planning/phases/05-hardening-and-conditional-polish/05-render-check.mjs [--sections profile,a11y,rehearse] [--out <dir>] [--chrome <path>] [--server preview]
 //
 // It serves dist/ with the production server from plan 05-01 (scripts/serve-dist.mjs, the same server and CSP
 // the Docker image runs) on 127.0.0.1:4175, drives headless Chrome or Edge over the DevTools protocol on
@@ -29,7 +30,7 @@ function argValue(flag) {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
-const sections = new Set((argValue('--sections') ?? 'profile,a11y').split(',').map((name) => name.trim()).filter(Boolean));
+const sections = new Set((argValue('--sections') ?? 'profile,a11y,rehearse').split(',').map((name) => name.trim()).filter(Boolean));
 const serverMode = argValue('--server') ?? 'serve-dist';
 const outDir = resolve(argValue('--out') ?? mkdtempSync(join(tmpdir(), 'culprit-05-render-')));
 
@@ -670,9 +671,207 @@ async function main() {
     await setMedia(true);
   }
 
+  // ---------------------------------------------------------------------------------------------------------
+  // Section: rehearse (plan 05-03): the three demo cases from a clean start, with every caveat visible
+
+  const REHEARSE_CASES = [
+    { id: 'checkout-outage', name: 'Checkout outage', hash: '2222222', lines: 71 },
+    { id: 'slow-burn', name: 'Slow-burn inventory failure', hash: '5555555', lines: 80 },
+    { id: 'ambiguous', name: 'Ambiguous search regression', hash: '9999999', lines: 80 },
+  ];
+  const LIMITS_CONSOLE = 'Limits: 1 MiB of log text, 10,000 events, 100 stack lines per event';
+  const LIMITS_MARKDOWN = '- Limits: 1048576 bytes of log text, 10000 events, 100 stack lines per event; input truncated: no';
+  const CAUTION_LEAD = 'Low confidence. Treat these as leads to check, not a diagnosis.';
+  const FOUR_CHIPS = ['Low confidence', 'Ambiguous', 'Weak evidence', 'No clear culprit'];
+
+  const REHEARSE_PROBE = `(() => {
+    const real = (node) => {
+      let out = '';
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) out += child.textContent;
+        else if (child.nodeType === 1 && child.getAttribute('aria-hidden') !== 'true') out += real(child);
+      }
+      return out;
+    };
+    const text = (selector) => { const node = document.querySelector(selector); return node ? real(node).trim() : null; };
+    const texts = (selector) => [...document.querySelectorAll(selector)].map((node) => real(node).trim());
+    const shown = (selector) => { const node = document.querySelector(selector); return !!node && node.getClientRects().length > 0; };
+    const detail = (label) => {
+      const heading = [...document.querySelectorAll('.trust-detail-label')].find((node) => node.textContent.trim() === label);
+      return heading ? heading.parentElement : null;
+    };
+    const detailText = (label) => { const node = detail(label); const p = node && node.querySelector('p'); return p ? real(p).trim() : null; };
+    const assumptions = detail('Assumptions');
+    const provenance = detail('Provenance');
+    const textarea = document.querySelector('.copy-fallback-text');
+    const trust = document.querySelector('.trust-details');
+    return JSON.stringify({
+      resultTitle: text('#result-title'),
+      titleFocused: document.activeElement === document.querySelector('#result-title'),
+      hash: text('#app .verdict .verdict-hash'),
+      noClear: text('#app .verdict .verdict-no-clear'),
+      onset: text('#app .verdict [data-fact="onset"] dd'),
+      cautionLead: text('#app .caution-banner:not(.truncation-banner) .caution-lead'),
+      chips: texts('#app .caution-banner:not(.truncation-banner) .chip-list .chip'),
+      headerChips: texts('.header-chips .chip'),
+      headerChipsShown: [...document.querySelectorAll('.header-chips .chip')].every((node) => node.getClientRects().length > 0),
+      footerHeading: text('#trust-footer-title'),
+      footerShown: shown('.trust-footer'),
+      countChip: text('.trust-footer-head .chip-warning'),
+      warnings: texts('.trust-footer .trust-item .trust-message'),
+      detailsOpen: !!trust && trust.open,
+      utc: detailText('Time zone'),
+      limits: detailText('Limits'),
+      rationale: detailText('Confidence rationale'),
+      assumptionCount: assumptions ? assumptions.querySelectorAll('li').length : 0,
+      provenance: provenance ? [...provenance.querySelectorAll('li')].map((node) => node.textContent.trim()) : [],
+      copyStatus: text('.copy-status'),
+      fallbackShown: !!textarea && !textarea.closest('[hidden]') && textarea.getClientRects().length > 0,
+      fallbackValue: textarea ? textarea.value : '',
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    });
+  })()`;
+
+  const countOf = (haystack, needle) => haystack.split(needle).length - 1;
+
+  /** One case at one size, from a clean page: landing, then the console, then the case card by keyboard. */
+  async function rehearseCase(bundled, width, height, { motion, permission }) {
+    const tag = `${bundled.id} ${width}x${height}${permission === 'granted' ? ' clipboard granted' : ''}${motion === 'reduce' ? '' : ' motion'}`;
+    await setMedia(motion === 'reduce');
+    await setViewport(width, height);
+    await cdp.send('Storage.clearDataForOrigin', { origin: ORIGIN, storageTypes: 'all' }).catch(() => undefined);
+    await cdp.send('Browser.resetPermissions').catch(() => undefined);
+    if (permission === 'granted') {
+      await cdp.send('Browser.grantPermissions', { origin: ORIGIN, permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] });
+    } else {
+      await cdp.send('Browser.setPermission', { permission: { name: 'clipboard-write' }, setting: 'denied', origin: ORIGIN });
+    }
+
+    await openFresh(`${ORIGIN}/`);
+    const landing = await evaluate(`(document.querySelector('#landing-title') || {}).textContent || null`);
+    check(landing === 'Which commit broke production?', `[${tag}] landing title is present from a clean start`, JSON.stringify(landing));
+    await evaluate(`location.hash = '#/app'; true`);
+    await poll('the case card', () => focusSelector(`button[data-case-id="${bundled.id}"]`), 5000, 50);
+    await press('Enter');
+    const expectedTitle = JSON.stringify(`Result: ${bundled.name}`);
+    await poll('the result title to be focused', () => evaluate(`(() => { const t = document.querySelector('#result-title'); return !!t && document.activeElement === t && t.textContent === ${expectedTitle}; })()`), 10000, 30);
+    let page = JSON.parse(await evaluate(REHEARSE_PROBE));
+    if (motion !== 'reduce') {
+      page = await poll(
+        'the entrance to settle',
+        async () => {
+          const next = JSON.parse(await evaluate(REHEARSE_PROBE));
+          return next.hash === bundled.hash ? next : null;
+        },
+        5000,
+        100,
+      );
+    }
+
+    check(page.resultTitle === `Result: ${bundled.name}` && page.titleFocused, `[${tag}] #result-title has focus and names the case`, `${page.resultTitle}`);
+    if (bundled.id === 'ambiguous') {
+      check(page.noClear === 'No clear culprit' && page.hash === bundled.hash, `[${tag}] verdict says No clear culprit with leading candidate ${bundled.hash}`, `${page.noClear} / ${page.hash}`);
+      check(page.cautionLead === CAUTION_LEAD, `[${tag}] caution lead is shown`, `${page.cautionLead}`);
+      check(JSON.stringify(page.chips) === JSON.stringify(FOUR_CHIPS), `[${tag}] the four caution labels appear in order`, page.chips.join(' | '));
+    } else {
+      check(page.hash === bundled.hash && page.noClear === null, `[${tag}] verdict shows ${bundled.hash}`, `${page.hash}`);
+      check(page.cautionLead === null, `[${tag}] no low-confidence caution on a confident case`, `${page.cautionLead}`);
+      if (bundled.id === 'slow-burn') {
+        check((page.onset ?? '').startsWith('Gradual ramp interpretation:'), `[${tag}] onset fact starts with the ramp interpretation`, `${(page.onset ?? '').slice(0, 60)}`);
+      }
+    }
+    check(
+      page.headerChips.includes('Local only: nothing leaves this browser') && page.headerChips.includes('All times UTC') && page.headerChipsShown,
+      `[${tag}] header chips Local only and All times UTC are visible`,
+      page.headerChips.join(' | '),
+    );
+    check(page.footerHeading === 'Warnings and caveats' && page.footerShown, `[${tag}] trust footer heading is visible`, `${page.footerHeading}`);
+    if (bundled.id === 'ambiguous') {
+      check(
+        page.countChip === '1 warning' && page.warnings.length === 1 && page.warnings[0].startsWith('No grouped application stack path overlaps'),
+        `[${tag}] trust footer shows 1 warning and its text`,
+        `${page.countChip} / ${page.warnings.join(' | ')}`,
+      );
+    } else {
+      check(page.countChip === null && page.warnings.length === 0, `[${tag}] trust footer shows no warning chip`, `${page.countChip}`);
+    }
+
+    // Open the disclosure with the keyboard.
+    await focusSelector('.trust-details summary');
+    await press('Enter');
+    await sleep(150);
+    page = JSON.parse(await evaluate(REHEARSE_PROBE));
+    check(page.detailsOpen, `[${tag}] Assumptions and caveats opens by keyboard`);
+    check(page.utc === 'All timestamps are normalized to UTC and shown without local conversion.', `[${tag}] UTC note is shown`, `${page.utc}`);
+    check(page.limits === LIMITS_CONSOLE, `[${tag}] limits are shown`, `${page.limits}`);
+    check(page.assumptionCount >= 8, `[${tag}] at least 8 assumptions are listed`, `${page.assumptionCount}`);
+    check((page.rationale ?? '').length > 0, `[${tag}] the confidence rationale is shown`, `${(page.rationale ?? '').slice(0, 60)}`);
+    check(
+      page.provenance.some((entry) => entry.includes(`fixtures/incidents/${bundled.id}/logs.jsonl`)) && page.provenance.some((entry) => entry.includes(`fixtures/incidents/${bundled.id}/history.json`)),
+      `[${tag}] provenance names both input files`,
+      page.provenance.join(' | '),
+    );
+    check(page.scrollWidth <= page.innerWidth, `[${tag}] no horizontal page scroll`, `scrollWidth ${page.scrollWidth} vs innerWidth ${page.innerWidth}`);
+
+    // Copy.
+    await focusSelector('.copy-button');
+    await press('Enter');
+    if (permission === 'granted') {
+      const status = await poll(
+        'the copied status',
+        async () => {
+          const next = JSON.parse(await evaluate(REHEARSE_PROBE));
+          return next.copyStatus ? next : null;
+        },
+        5000,
+        50,
+      );
+      check(status.copyStatus === `Markdown postmortem copied (${bundled.lines} lines).` && !status.fallbackShown, `[${tag}] clipboard copy reports ${bundled.lines} lines`, `${status.copyStatus}`);
+      return;
+    }
+    page = await poll(
+      'the fallback text',
+      async () => {
+        const next = JSON.parse(await evaluate(REHEARSE_PROBE));
+        return next.fallbackShown && next.fallbackValue.length > 0 ? next : null;
+      },
+      5000,
+      50,
+    );
+    const markdown = page.fallbackValue;
+    check(page.fallbackShown, `[${tag}] denied clipboard reveals the fallback text box`, `${page.copyStatus}`);
+    if (motion !== 'reduce') return;
+    check(countOf(markdown, '\n') === bundled.lines, `[${tag}] Markdown has ${bundled.lines} newline-terminated lines`, `${countOf(markdown, '\n')}`);
+    check(markdown.includes('## UTC disclosure') && markdown.includes(LIMITS_MARKDOWN), `[${tag}] Markdown carries the UTC disclosure and the Limits line`);
+    check(countOf(markdown, '- Assumption: ') === 8 && markdown.includes('- Rationale: '), `[${tag}] Markdown carries eight assumptions and the rationale`, `${countOf(markdown, '- Assumption: ')} assumptions`);
+    check(markdown.includes(`- Logs: \`fixtures/incidents/${bundled.id}/logs.jsonl\``), `[${tag}] Markdown names the log provenance`);
+    if (bundled.id === 'ambiguous') {
+      check(
+        markdown.includes('- Labels: low-confidence, ambiguous, weak-evidence, no-clear-culprit') && markdown.includes('- Warning: '),
+        `[${tag}] ambiguous Markdown check: labels and warning are in the copied text`,
+      );
+    }
+    check(!/\bcaused\b|root cause|culprit found|broke production|\d\s*%/i.test(markdown), `[${tag}] Markdown never overclaims`);
+  }
+
+  async function runRehearse() {
+    console.log('SECTION rehearse');
+    for (const bundled of REHEARSE_CASES) {
+      for (const [width, height] of [[1280, 720], [360, 740]]) {
+        await rehearseCase(bundled, width, height, { motion: 'reduce', permission: 'denied' });
+      }
+    }
+    await rehearseCase(REHEARSE_CASES[0], 1280, 720, { motion: 'reduce', permission: 'granted' });
+    await rehearseCase(REHEARSE_CASES[0], 1280, 720, { motion: 'no-preference', permission: 'denied' });
+    await cdp.send('Browser.resetPermissions').catch(() => undefined);
+    await setMedia(true);
+  }
+
   try {
     if (sections.has('profile')) await runProfile();
     if (sections.has('a11y')) await runA11y();
+    if (sections.has('rehearse')) await runRehearse();
   } catch (error) {
     fail('check aborted', error.message);
   }

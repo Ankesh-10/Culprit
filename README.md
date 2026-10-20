@@ -46,11 +46,20 @@ make test
 2. `npm test` (Vitest in non-watch mode)
 3. `npm run build`
 
-The command is offline-capable after project dependencies are installed. It covers the current core serialization and three shared incident fixture contracts; later phases extend the same Vitest discovery with parser, onset, grouping, scoring, determinism, worker, and UI-contract tests. No test starts a server, requires Docker, reads a machine-specific absolute path, or calls a remote URL.
+The command is offline-capable after project dependencies are installed. The suite covers the log and history parsers, onset detection, signature grouping, scoring and ranking, determinism and pinned output fingerprints (SHA-256 of the canonical JSON and the Markdown of the three bundled incidents, so any change to analysis or export output fails until it is made deliberately), the incident fixture contracts, the worker protocol, the UI view models, near-cap input boundaries, contrast and motion design rules, static safety checks and the rebuild surface. No test starts a server, requires Docker, reads a machine-specific absolute path, or calls a remote URL.
 
 After `npm run build`, `node scripts/serve-dist.mjs --smoke` starts the production static server on a loopback port, checks the content types, headers, refusals and the worker chunk against the real `dist/` output, and prints `SMOKE PASS` as its last line (exit 0) or `SMOKE FAIL (n)` (exit 1). It sends requests only to that loopback server.
 
 The committed workflow `.github/workflows/ci.yml` repeats the rebuild on Linux on every push: it reads the Node version from `.nvmrc`, runs `npm ci` and `make test`, runs the smoke check, builds the Docker image, starts the container, probes it, and runs the same smoke check inside the image. On a Windows host without `make`, the equivalent of `make test` is `npm run typecheck && npm test && npm run build`.
+
+Two optional real-browser checks need a local Chrome or Edge and are not part of `make test`. Run each from the repository root after `npm run build`; both print `PASS`, `WARN` and `FAIL` lines and end with `RESULT PASS` or `RESULT FAIL (n)`:
+
+```sh
+node .planning/phases/05-hardening-and-conditional-polish/05-render-check.mjs
+node .planning/quick/261020-gzd-landing-page-with-feature-tabs-and-scrol/261020-gzd-render-check.mjs
+```
+
+The first serves `dist/` through `scripts/serve-dist.mjs` (the same server and policy the Docker image runs), profiles a near-cap incident, sweeps keyboard, focus, reduced-motion, forced-colours and width behaviour, and rehearses the three bundled incidents from a clean browser profile at 1280x720 and 360x740, checking the verdict, the caution labels, the trust footer and the copied Markdown with no console error and no off-origin request. The second checks the landing page.
 
 `.gitattributes` pins LF line endings for every text file, so a clean clone on any platform (including Windows with `core.autocrlf`) reproduces byte-identical fixture outputs.
 
@@ -119,7 +128,7 @@ Ranking is a frozen, explainable heuristic (`scoring-v1`). It never uses a model
 - **Rounding.** Scores and contributions are rounded to 6 decimals. Comparisons use integer micro-units, so ordering does not depend on floating-point noise.
 - **Tie-break.** Candidates are ordered by score, then trace match, then the newer commit, then SHA. At most three suspects are shown; remaining eligible commits are listed as also scored.
 - **Confidence band and labels.** A separation below 0.05 between the top two scores, or an ambiguous onset, is labeled `ambiguous`. Fewer than half of the error events matching a changed line is labeled `weak-evidence`. `ambiguous` together with `weak-evidence` is labeled `no-clear-culprit`. Any of these puts the band at low and adds `low-confidence`. Otherwise a gradual ramp, a separation below 0.15, or application stack frames on fewer than three quarters of the error events cap the band at medium; everything else is high.
-- **Export.** The Markdown export escapes all supplied text (commit subjects, authors, log-derived details, diagnostics) so it cannot add headings, links, HTML, or extra lines. Every ranked report states that scores are ranked suspicion, not probability or proof of causality.
+- **Export.** The Markdown export escapes all supplied text (commit subjects, authors, log-derived details, diagnostics) so it cannot add headings, links, HTML, or extra lines. Every ranked report states that scores are ranked suspicion, not probability or proof of causality. The Provenance section also lists the input limits and whether the input was truncated, so a capped analysis cannot travel without them.
 
 ## Using the console
 
@@ -136,7 +145,7 @@ Keyboard use: Tab reaches every control, including the file pickers (Enter or Sp
 
 ## Limitations
 
-Culprit narrows investigation; it does not roll back code, auto-fix a deployment, establish causality, or replace human review. The parser, onset detector, evidence ranking, and Markdown export are implemented; the worker and investigation console are still pending. Those later phases must consume the same fixture files and preserve the local privacy, UTC, determinism, confidence, and rebuild contracts documented here.
+Culprit narrows investigation; it does not roll back code, auto-fix a deployment, establish causality, or replace human review. The parser, onset detector, evidence ranking, Markdown export, analysis worker, and investigation console are implemented and share one set of fixture files; the local privacy, UTC, determinism, confidence, and rebuild contracts documented here apply to all of them.
 
 Ranking limits:
 
@@ -144,7 +153,9 @@ Ranking limits:
 - Vendor, runtime, build-output, and absolute-path frames are not matched. Top-level directories named `dist`, `build`, `out`, `coverage`, or `internal` are treated as non-application.
 - Novelty treats the start of the supplied log as the start of observation.
 - The onset window can start after the first error; the onset heuristics are unchanged by ranking.
-- History size is not capped yet.
+- History text is not capped by the core. A chosen file over 1 MiB is refused before it is read, and the lists that can grow render 100 rows at a time: "Commits considered", the log lines and the data table each show a page of 100 with a true total and a "Show next 100" control, so nothing is dropped.
 - Timelines over 10,000 buckets are rejected with an input-limit error.
+- Near-cap profile: `node scripts/near-cap-input.mjs --write <dir>` writes a deterministic incident of 9,990 events (1,005,180 bytes of log text over 9,729 five-minute buckets) and a history of 3,000 commits (767,964 bytes). In headless Chrome on the development laptop the worker analyzed it and the result was on screen about 0.3 s after "Analyze incident" (321 ms measured), the page stayed responsive while it ran, and the longest main-thread task was about 70 ms. These are single-machine measurements, not a guarantee; an unrelated machine will differ.
+- The `/` command-palette shortcut is a single-character key that works outside text fields, and there is no setting to turn it off (WCAG 2.1.4, Character Key Shortcuts). Ctrl or Cmd+K and the visible "Press / to jump to a case" button do the same thing.
 
 Font note: the UI ships with system font stacks (Segoe UI Variable or the platform UI face for text, a monospace stack for hashes, paths and log lines). To use Inter (preferred), Geist or Geist Mono instead, add the matching WOFF2 files (`Inter-Variable.woff2`, `Geist-Variable.woff2`, `GeistMono-Variable.woff2`) and `OFL.txt` under `src/assets/fonts` (see `FONTS.md` in that folder); the build bundles them locally and never loads fonts from a network.
