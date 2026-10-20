@@ -279,14 +279,19 @@ kbd {
   cursor: pointer;
 }
 
-/* Controls draw 36px but accept clicks across 44px: a transparent band above and below. */
+/* Controls draw 36px but accept clicks across 44px: a transparent band centred on the button, 4px above
+   and below. It is sized and centred explicitly so the border width cannot shift it. */
 .button-primary::after,
 .button-secondary::after,
 .button-destructive::after,
 .case-toggle::after {
   content: "";
   position: absolute;
-  inset: calc((var(--control-height) - var(--hit-min)) / 2) 0;
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: var(--hit-min);
+  transform: translateY(-50%);
 }
 
 .button-primary {
