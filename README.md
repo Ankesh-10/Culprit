@@ -48,9 +48,17 @@ make test
 
 The command is offline-capable after project dependencies are installed. It covers the current core serialization and three shared incident fixture contracts; later phases extend the same Vitest discovery with parser, onset, grouping, scoring, determinism, worker, and UI-contract tests. No test starts a server, requires Docker, reads a machine-specific absolute path, or calls a remote URL.
 
+After `npm run build`, `node scripts/serve-dist.mjs --smoke` starts the production static server on a loopback port, checks the content types, headers, refusals and the worker chunk against the real `dist/` output, and prints `SMOKE PASS` as its last line (exit 0) or `SMOKE FAIL (n)` (exit 1). It sends requests only to that loopback server.
+
+The committed workflow `.github/workflows/ci.yml` repeats the rebuild on Linux on every push: it reads the Node version from `.nvmrc`, runs `npm ci` and `make test`, runs the smoke check, builds the Docker image, starts the container, probes it, and runs the same smoke check inside the image. On a Windows host without `make`, the equivalent of `make test` is `npm run typecheck && npm test && npm run build`.
+
+`.gitattributes` pins LF line endings for every text file, so a clean clone on any platform (including Windows with `core.autocrlf`) reproduces byte-identical fixture outputs.
+
+Docker and `make` were not available on the development host (Windows, Node 24 against the pinned Node 22), so the image build is proven by the CI run, not by a local build.
+
 ## Docker
 
-The multi-stage Dockerfile uses Node `22.20.0` for both build and runtime stages. The build stage copies `package.json` and `package-lock.json`, runs `npm ci`, copies the repository, and produces `dist/`. The runtime stage contains only Node and the static `dist/` artifact; its small built-in HTTP server listens on `0.0.0.0:4173`. No global package install or secret is used.
+The multi-stage Dockerfile uses Node `22.20.0` for both build and runtime stages. The build stage copies `package.json` and `package-lock.json`, runs `npm ci`, copies the repository, and produces `dist/`. The runtime stage contains only Node, the static `dist/` artifact and the server script `scripts/serve-dist.mjs`, which runs as the unprivileged `node` user and listens on `0.0.0.0:4173`. No global package install or secret is used.
 
 Build and run it with:
 
@@ -60,6 +68,15 @@ docker run --rm --publish 4173:4173 culprit:phase1
 ```
 
 Open <http://localhost:4173/>. `GET /` serves `dist/index.html`; static assets are served from `dist/`, and application routes fall back to `index.html`. The image health check requests the local root URL and reports unhealthy for a non-success response. Docker's `npm ci` still needs registry access unless its builder has a populated cache; the running image is network-free.
+
+What `scripts/serve-dist.mjs` guarantees:
+
+- Content types: `text/html; charset=utf-8` for pages, `text/javascript; charset=utf-8` for scripts (including the analysis worker chunk), `text/css; charset=utf-8` for styles, plus SVG, WOFF2, JSON, text, PNG and icon types; anything else is `application/octet-stream`.
+- Every response, errors included, carries `Content-Security-Policy` with `default-src 'none'` and `connect-src 'none'` (the page cannot open a network connection), `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`.
+- A traversal attempt or malformed percent-encoding gets `400` and the server keeps running; a missing file with an extension gets `404`; an extensionless application route falls back to `index.html`; only `GET` and `HEAD` are served (other methods get `405` with `Allow: GET, HEAD`).
+- It never logs request paths, headers or bodies and makes no outbound request.
+
+Run `node scripts/serve-dist.mjs --smoke` after `npm run build` to check all of this against the real build; CI runs the same smoke check on the host build and inside the built image.
 
 ## Static deployment and demo
 

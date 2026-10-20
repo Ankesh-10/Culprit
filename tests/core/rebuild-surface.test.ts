@@ -99,6 +99,25 @@ describe('repository rebuild surface', () => {
     expect(contractText).not.toMatch(/(?:AKIA|BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY|password\s*[:=])/i);
   });
 
+  it('pins LF line endings and commits a Linux CI rebuild with the pinned Node', () => {
+    const gitattributes = readProjectFile('.gitattributes');
+    const workflow = readProjectFile('.github/workflows/ci.yml');
+
+    expect(gitattributes.split('\n')[0]).toBe('* text=auto eol=lf');
+    for (const expected of [
+      'node-version-file: .nvmrc',
+      'npm ci',
+      'make test',
+      'node scripts/serve-dist.mjs --smoke',
+      'docker build --tag culprit:phase1 .',
+      'docker exec culprit node scripts/serve-dist.mjs --smoke',
+      'contents: read',
+    ]) {
+      expect(workflow).toContain(expected);
+    }
+    expect(workflow).not.toMatch(/secrets\./);
+  });
+
   it('keeps dependency and build noise out of the Docker context', () => {
     expect(readProjectFile('.dockerignore')).toContain('node_modules');
     expect(readProjectFile('.dockerignore')).toContain('dist');

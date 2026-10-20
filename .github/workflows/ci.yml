@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Typecheck, test and build
+        run: make test
+
+      - name: Smoke-check the production server against the host build
+        run: node scripts/serve-dist.mjs --smoke
+
+      - name: Build the Docker image
+        run: docker build --tag culprit:phase1 .
+
+      - name: Start the container
+        run: docker run --detach --name culprit --publish 4173:4173 culprit:phase1
+
+      - name: Probe the running container
+        shell: bash
+        run: |
+          result=""
+          for attempt in $(seq 1 30); do
+            result="$(curl -sS -o /dev/null -w '%{http_code} %{content_type}' http://127.0.0.1:4173/ || true)"
+            if [ "$result" = "200 text/html; charset=utf-8" ]; then
+              echo "container answered: $result"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "container did not answer 200 text/html; last result: $result" >&2
+          exit 1
+
+      - name: Smoke-check inside the image
+        run: docker exec culprit node scripts/serve-dist.mjs --smoke
+
+      - name: Container logs and cleanup
+        if: always()
+        run: |
+          docker logs culprit || true
+          docker rm --force culprit || true
