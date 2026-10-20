@@ -248,16 +248,21 @@ kbd {
   align-self: flex-start;
   gap: var(--space-xs);
   padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--color-control-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-key);
-  background: transparent;
+  background: var(--color-raised);
   color: var(--color-ink-2);
   font-size: var(--text-label);
   font-weight: var(--weight-regular);
   line-height: var(--leading-label);
 }
 
-.chip-warning { color: var(--color-ink); }
+.chip-warning {
+  border-color: transparent;
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
 .chip-warning .icon { color: var(--color-warning); }
 
 /* Buttons */
@@ -413,6 +418,7 @@ kbd {
   align-items: center;
   gap: var(--space-sm);
   padding: var(--space-md);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-ink);
@@ -426,7 +432,7 @@ kbd {
 .tone-critical .icon { color: var(--color-critical); }
 
 .status-banner.tone-critical {
-  padding-left: calc(var(--space-md) - 4px);
+  padding-left: calc(var(--space-md) - 3px);
   border-left: 4px solid var(--color-critical);
 }
 
@@ -640,6 +646,8 @@ kbd {
   flex-direction: column;
   gap: var(--space-sm);
   padding: var(--space-md);
+  padding-left: calc(var(--space-md) - 3px);
+  border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-critical);
   border-radius: var(--radius-card);
   background: var(--color-raised);
@@ -745,7 +753,8 @@ kbd {
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
   padding: var(--space-md);
-  padding-left: calc(var(--space-md) - 4px);
+  padding-left: calc(var(--space-md) - 3px);
+  border: 1px solid var(--color-border);
   border-left: 4px solid var(--color-warning);
   border-radius: var(--radius-row);
   background: var(--color-raised);
@@ -1084,6 +1093,7 @@ kbd {
 
 .considered-table th {
   color: var(--color-ink-2);
+  border-bottom: 1px solid var(--color-hairline-strong);
   font-weight: var(--weight-medium);
   white-space: nowrap;
 }
@@ -1193,6 +1203,29 @@ kbd {
   overflow-wrap: anywhere;
 }
 
+/* Keycaps: flat, mono, hairline. The timeline key hint documents keys the slider already handles. */
+
+kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-key);
+  background: var(--color-raised);
+  color: var(--color-ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: 20px;
+  text-align: center;
+}
+
+.key-hint {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
 /* Timeline: toolbar, legend, marks, labels, tooltip and table twin */
 
 .timeline-toolbar {
@@ -1270,6 +1303,7 @@ kbd {
   flex-direction: column;
   max-width: 260px;
   padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-row);
   background: var(--color-raised);
   color: var(--color-ink);
@@ -1316,6 +1350,7 @@ kbd {
 
 .twin-table th {
   color: var(--color-ink-2);
+  border-bottom: 1px solid var(--color-hairline-strong);
   font-weight: var(--weight-medium);
   white-space: nowrap;
 }
@@ -1371,6 +1406,7 @@ kbd {
 
 .log-table th {
   color: var(--color-ink-2);
+  border-bottom: 1px solid var(--color-hairline-strong);
   font-weight: var(--weight-medium);
   white-space: nowrap;
 }
@@ -1438,6 +1474,7 @@ kbd {
 
 .signatures-table thead th {
   color: var(--color-ink-2);
+  border-bottom: 1px solid var(--color-hairline-strong);
   font-weight: var(--weight-medium);
   white-space: nowrap;
 }
@@ -1712,7 +1749,7 @@ kbd {
 .suspect-drawer:focus,
 .suspect-drawer:focus-visible { outline: none; }
 
-.suspect-drawer::backdrop { background: rgba(5, 10, 18, 0.64); }
+.suspect-drawer::backdrop { background: rgba(0, 0, 0, 0.72); }
 
 .drawer-header {
   position: sticky;
@@ -2035,6 +2072,7 @@ kbd {
   .case-card,
   .case-toggle,
   .status-banner,
+  kbd,
   .chip { border: 1px solid CanvasText; }
 
   .case-card.is-loaded,

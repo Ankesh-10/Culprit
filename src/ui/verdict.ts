@@ -8,7 +8,7 @@ export interface VerdictHandlers {
   onInspect(rank: number, opener: HTMLElement): void;
 }
 
-/** Three-segment meter; filled segments carry the accent fill, the visible words repeat the band. */
+/** Three-segment meter; filled segments carry the ink fill, the visible words repeat the band. */
 export function renderConfidenceMeter(view: VerdictView['confidence']): HTMLElement {
   const segments = [1, 2, 3].map((position) =>
     el('span', { className: position <= view.filled ? 'meter-segment is-filled' : 'meter-segment' }),
@@ -36,7 +36,7 @@ function renderCaution(caution: NonNullable<VerdictView['caution']>): HTMLElemen
       el(
         'ul',
         { className: 'chip-list', attrs: { 'aria-label': 'Confidence labels' } },
-        caution.chips.map((chip) => el('li', { className: 'chip', text: chip })),
+        caution.chips.map((chip) => el('li', { className: 'chip chip-warning' }, [icon('alert-triangle', 'icon'), chip])),
       ),
     ]),
   ]);

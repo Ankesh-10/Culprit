@@ -175,6 +175,15 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   const title = el('p', { className: 'chart-title', text: `Errors per ${minutes}-minute interval (UTC)` });
   const legend = el('ul', { className: 'chart-legend' });
   const chartHost = el('div', { className: 'chart-host' });
+  const keyHint = el('p', { className: 'key-hint' }, [
+    'Keys: ',
+    el('kbd', { text: '←' }),
+    ' ',
+    el('kbd', { text: '→' }),
+    ' move between intervals, ',
+    el('kbd', { text: 'Enter' }),
+    ' opens log lines',
+  ]);
   const slider = el('div', {
     className: 'timeline-slider',
     attrs: {
@@ -586,7 +595,7 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   });
   slider.addEventListener('blur', hideTooltip);
 
-  section.append(header, title, legend, chartHost);
+  section.append(header, title, legend, chartHost, keyHint);
   if (noteLine !== null) section.append(noteLine);
   section.append(readoutBar, twin);
 
