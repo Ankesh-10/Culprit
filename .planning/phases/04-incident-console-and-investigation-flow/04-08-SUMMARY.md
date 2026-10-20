@@ -47,7 +47,7 @@ key-decisions:
   - "A loaded file's text is also placed in the paste box (editing it detaches the file name), so what is analyzed is always visible and editable"
   - "A refused or unreadable file leaves any previously loaded file in place and shows a role=alert message under the field"
 
-requirements-completed: []
+requirements-completed: [UX-01, UX-08, UX-09]
 
 coverage:
   - id: D1
@@ -103,19 +103,19 @@ coverage:
     rationale: "Visual look of the zone, 320px layout and the 200-character file-name wrap are checked in the Task 3 walk-through."
 
 duration: 40 min
-status: partial
+status: complete
 plan_head_before: eca8085f6cf2089698fa6ba8fcda0516401e1abf
-plan_head_after: 8e307b6f2e8eadfebc683d44a805473081980b03
+plan_head_after: 1dcd83f4c003eaee4f0641611a79bbb6a1996117
 commits: 3
 ---
 
-# Phase 4 Plan 08: Bring your own log and history, recoverable validation errors, and the end-of-phase walk-through (PARTIAL: Tasks 1-2 done, Task 3 checkpoint pending)
+# Phase 4 Plan 08: Bring your own log and history, recoverable validation errors, and the end-of-phase walk-through 
 
 **Developers can analyze their own incident by pasting, picking or dropping a log and a Culprit JSON history, with a 1 MiB pre-read gate, format auto-detection, plain-language field-mapped errors with Fix input links, and a safe two-step Clear inputs; the plan stops at the single end-of-phase human walk-through.**
 
 ## Status
 
-Tasks 1 and 2 are complete and committed. Task 3 (`checkpoint:human-verify`, `gate="blocking"`) is awaiting the user. This summary is partial; it is finalized (requirements marked complete, `status: complete`) after the user replies. Requirement IDs UX-08, UX-09 and UX-01 are therefore not yet marked complete.
+All three tasks are complete. Task 3 (`checkpoint:human-verify`) outcome: **approved** by the user, with the system-font fallback kept (no Geist files added, so FONTS.md stays at "Current status: system font fallback").
 
 ## Task Commits
 
@@ -133,7 +133,9 @@ Tasks 1 and 2 are complete and committed. Task 3 (`checkpoint:human-verify`, `ga
 
 ## Verification
 
-`npm run typecheck`, `npm test` (29 files, 437 tests) and `npm run build` pass at `8e307b6`.
+`npm run typecheck`, `npm test` (29 files, 437 tests) and `npm run build` pass, re-run after the checkpoint approval.
+
+Note: `commits: 4` counts the three code/test commits plus the interim partial-summary docs commit `1dcd83f`; the final docs commit is not counted. `requirements.mark-complete` could not match UX-01, UX-08 and UX-09 in REQUIREMENTS.md, so their checkboxes were left unchecked (not hand-edited).
 
 ## Deviations from Plan
 
@@ -147,9 +149,9 @@ None.
 
 None. T-04-22 mitigated (size gate before read, boundary tested), T-04-23 (text-only DOM, `static-safety.test.ts` green), T-04-24 (`safeSourceName` fallbacks tested), T-04-25 (no storage API, inputs in memory only). T-04-26 and T-04-SC-08: no fonts added, no package installed.
 
-## Pending: Task 3 checkpoint
+## Checkpoint outcome
 
-See the checkpoint return to the orchestrator for the exact walk-through steps (0-8, including the optional Geist fonts step). After "approved with fonts", FONTS.md "Current status" becomes "Geist bundled locally" and `npm test` / `npm run build` are re-run.
+Task 3 end-of-phase walk-through: user reply "approved" (system-font fallback kept). No issues were reported, so no gap-closure items are recorded.
 
 ## Self-Check: PASSED
 
