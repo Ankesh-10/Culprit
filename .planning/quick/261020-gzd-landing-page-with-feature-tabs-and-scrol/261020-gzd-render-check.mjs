@@ -741,6 +741,149 @@ async function main() {
     }
   };
 
+  const TAB_PROBE = `(() => {
+    const visible = (node) => !!node && node.getClientRects().length > 0 && (typeof node.checkVisibility !== 'function' || node.checkVisibility());
+    const tablist = document.querySelector('#features [role="tablist"]');
+    const tabs = [...document.querySelectorAll('#features [role="tab"]')];
+    const panels = [...document.querySelectorAll('#features [role="tabpanel"]')];
+    const wiring = tabs.map((tab) => {
+      const panel = document.getElementById(tab.getAttribute('aria-controls') || '');
+      return !!panel && panel.getAttribute('role') === 'tabpanel' && panel.getAttribute('aria-labelledby') === tab.id;
+    });
+    const active = document.activeElement;
+    const timelineSvg = document.querySelector('#feature-panel-timeline svg.timeline-svg');
+    return JSON.stringify({
+      tablistVisible: visible(tablist),
+      tabCount: tabs.length,
+      panelCount: panels.length,
+      selected: tabs.map((tab, index) => (tab.getAttribute('aria-selected') === 'true' ? index : -1)).filter((index) => index >= 0),
+      tabbable: tabs.filter((tab) => tab.tabIndex === 0).map((tab) => tab.dataset.tab),
+      wiringOk: wiring.every(Boolean),
+      visiblePanels: panels.filter((panel) => visible(panel)).map((panel) => panel.dataset.panel),
+      focusTab: active && active.dataset ? active.dataset.tab || null : null,
+      timelineWidth: timelineSvg ? timelineSvg.getBoundingClientRect().width : null,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    });
+  })()`;
+
+  const PREVIEW_PROBE = `(() => {
+    const frames = [...document.querySelectorAll('#features .preview-frame')];
+    const bad = frames.filter((frame) => frame.getAttribute('role') !== 'region' || !frame.getAttribute('aria-label')).length;
+    const focusable = [...document.querySelectorAll('#view-landing .preview-body a[href], #view-landing .preview-body button, #view-landing .preview-body input, #view-landing .preview-body select, #view-landing .preview-body textarea, #view-landing .preview-body [tabindex]')]
+      .filter((node) => node.tabIndex >= 0 && !node.closest('[inert]'));
+    const ids = [...document.querySelectorAll('[id]')].map((node) => node.id);
+    const seen = new Set();
+    const duplicates = [...new Set(ids.filter((id) => (seen.has(id) ? true : (seen.add(id), false))))];
+    const inertTabs = ['suspects', 'timeline', 'drawer'].map((id) => {
+      const body = document.querySelector('#feature-panel-' + id + ' .preview-body');
+      return !!body && body.hasAttribute('inert');
+    });
+    const lineup = document.querySelector('#feature-panel-suspects .lineup-hash');
+    const lines = [...document.querySelectorAll('#feature-panel-postmortem .md-line')];
+    return JSON.stringify({
+      frames: frames.length,
+      bad,
+      tabbableInPreviews: focusable.map((node) => node.tagName.toLowerCase() + '.' + String(node.className).split(' ')[0]),
+      duplicates,
+      suspectRankHooks: document.querySelectorAll('#view-landing [data-suspect-rank]').length,
+      inertTabs,
+      lineupHash: lineup ? lineup.textContent : null,
+      mdLines: lines.length,
+      mdFirst: lines[0] ? lines[0].textContent : null,
+      trust: (document.querySelector('#trust') || { textContent: '' }).textContent,
+    });
+  })()`;
+
+  /** The six feature tabs: roles, keyboard model, previews, ids and the trust strip, at `${ORIGIN}/`. */
+  const runTabChecks = async (tag, fileTag, width, reduce) => {
+    try {
+      await openFresh(`${ORIGIN}/`);
+      await poll('six feature previews', () => evaluate(`document.querySelectorAll('#features .preview-frame').length === 6`), 8000, 50);
+      const probe = async () => JSON.parse(await evaluate(TAB_PROBE));
+      let now = await probe();
+      report(now.tablistVisible && now.tabCount === 6 && now.panelCount === 6 ? 'PASS' : 'FAIL', `[${tag}] tablist visible with ${now.tabCount} tabs and ${now.panelCount} panels`);
+      report(now.selected.length === 1 && now.selected[0] === 0 && now.tabbable.length === 1 && now.tabbable[0] === 'onset' ? 'PASS' : 'FAIL', `[${tag}] first tab selected (${JSON.stringify(now.selected)}), roving tabindex on ${JSON.stringify(now.tabbable)}`);
+      report(now.wiringOk ? 'PASS' : 'FAIL', `[${tag}] every tab controls a tabpanel labelled by that tab`);
+      report(now.visiblePanels.length === 1 && now.visiblePanels[0] === 'onset' ? 'PASS' : 'FAIL', `[${tag}] only the selected panel is visible (${JSON.stringify(now.visiblePanels)})`);
+
+      // Click the third tab with trusted mouse events.
+      await evaluate(SAMPLER_RESET);
+      await clickAt('#feature-tab-timeline');
+      await poll('the timeline panel', async () => (await probe()).visiblePanels[0] === 'timeline', 3000, 30);
+      await sleep(reduce ? 500 : 150);
+      now = await probe();
+      report(now.selected[0] === 2 && now.focusTab === 'timeline' && now.visiblePanels.length === 1 ? 'PASS' : 'FAIL', `[${tag}] click selects and focuses the third tab (selected ${JSON.stringify(now.selected)}, focus ${now.focusTab})`);
+      try {
+        await poll('the timeline preview width', async () => (await probe()).timelineWidth > 0, 4000, 50);
+        report('PASS', `[${tag}] timeline preview svg is drawn (width ${(await probe()).timelineWidth})`);
+      } catch (error) {
+        report('FAIL', `[${tag}] timeline preview svg has no width`);
+      }
+      const switchSample = JSON.parse(await evaluate(SAMPLER_READ));
+      if (reduce) report(switchSample.max === 0 ? 'PASS' : 'FAIL', `[${tag}] a tab switch runs no animation (max ${switchSample.max})`);
+      else report(switchSample.names.includes('motion-rise') ? 'PASS' : 'FAIL', `[${tag}] a tab switch rises in (animations: ${switchSample.names.join(', ')})`);
+      await evaluate('window.scrollTo(0, 0)');
+      await evaluate(`document.querySelector('#features').scrollIntoView({ block: 'start' })`);
+      await sleep(reduce ? 100 : 1200);
+      await screenshot(`tabs-${fileTag}.png`, false);
+
+      // Arrow keys, End, Home and wrap-around with real key events.
+      const keySteps = [
+        ['ArrowRight', 39, 3, 'drawer'],
+        ['End', 35, 5, 'offline'],
+        ['Home', 36, 0, 'onset'],
+        ['ArrowLeft', 37, 5, 'offline'],
+      ];
+      await clickAt('#feature-tab-timeline');
+      await press('ArrowRight', 'ArrowRight', 39);
+      await sleep(80);
+      now = await probe();
+      report(now.selected[0] === 3 && now.focusTab === 'drawer' ? 'PASS' : 'FAIL', `[${tag}] ArrowRight selects and focuses the fourth tab (selected ${JSON.stringify(now.selected)}, focus ${now.focusTab})`);
+      for (const [key, code, index, id] of keySteps.slice(1)) {
+        await press(key, key, code);
+        await sleep(80);
+        now = await probe();
+        report(now.selected[0] === index && now.focusTab === id && now.tabbable[0] === id && now.visiblePanels[0] === id ? 'PASS' : 'FAIL', `[${tag}] ${key} selects and focuses "${id}" (selected ${JSON.stringify(now.selected)}, focus ${now.focusTab})`);
+      }
+      // Tab leaves the tablist for the selected panel, so there is no keyboard trap.
+      await press('Tab', 'Tab', 9);
+      await sleep(80);
+      const afterTab = await evaluate(`document.activeElement && document.activeElement.getAttribute('role')`);
+      report(afterTab === 'tabpanel' ? 'PASS' : 'FAIL', `[${tag}] Tab leaves the tablist for the tab panel (role ${afterTab})`);
+
+      // Every panel: a labelled region, inert renderer previews, no horizontal scroll.
+      for (const id of ['onset', 'suspects', 'timeline', 'drawer', 'postmortem', 'offline']) {
+        await evaluate(`document.querySelector('#feature-tab-${id}').click()`);
+        await sleep(60);
+        now = await probe();
+        report(now.scrollWidth <= now.innerWidth && now.visiblePanels[0] === id ? 'PASS' : 'FAIL', `[${tag}] panel "${id}": scrollWidth ${now.scrollWidth} vs innerWidth ${now.innerWidth}`);
+      }
+      const previews = JSON.parse(await evaluate(PREVIEW_PROBE));
+      report(previews.frames === 6 && previews.bad === 0 ? 'PASS' : 'FAIL', `[${tag}] ${previews.frames} preview frames, ${previews.bad} without a region role or label`);
+      report(previews.inertTabs.every(Boolean) ? 'PASS' : 'FAIL', `[${tag}] renderer previews are inert (${JSON.stringify(previews.inertTabs)})`);
+      report(previews.tabbableInPreviews.length === 0 ? 'PASS' : 'FAIL', `[${tag}] no previews content in the tab order (${previews.tabbableInPreviews.join(', ') || 'none'})`);
+      report(previews.duplicates.length === 0 ? 'PASS' : 'FAIL', `[${tag}] duplicate ids: ${previews.duplicates.join(', ') || 'none'}`);
+      report(previews.suspectRankHooks === 0 ? 'PASS' : 'FAIL', `[${tag}] data-suspect-rank hooks inside the landing: ${previews.suspectRankHooks}`);
+      report(previews.lineupHash === '2222222' ? 'PASS' : 'FAIL', `[${tag}] suspects preview leading hash ${previews.lineupHash}`);
+      report(previews.mdLines >= 1 && previews.mdLines <= 14 && previews.mdFirst === '# Culprit analysis' ? 'PASS' : 'FAIL', `[${tag}] postmortem preview: ${previews.mdLines} lines, first "${previews.mdFirst}"`);
+      report(previews.trust.includes('1 MiB') && previews.trust.includes('10,000 events') ? 'PASS' : 'FAIL', `[${tag}] trust strip states the limits`);
+      if (!reduce) {
+        try {
+          await poll('the tab animation to settle', () => evaluate(SETTLED_NOW), 3000, 50);
+          report('PASS', `[${tag}] tab animations settle`);
+        } catch (error) {
+          report('FAIL', `[${tag}] ${error.message}`);
+        }
+      } else {
+        const sampled = JSON.parse(await evaluate(SAMPLER_READ));
+        report(sampled.max === 0 ? 'PASS' : 'FAIL', `[${tag}] no animation across every tab switch (max ${sampled.max})`);
+      }
+    } catch (error) {
+      report('FAIL', `[${tag}] tabs: ${error.message}`);
+    }
+  };
+
   const viewports = [
     { width: 1280, height: 720, mobile: false },
     { width: 360, height: 740, mobile: true },
@@ -754,6 +897,7 @@ async function main() {
       await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile });
       await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode }] });
       await runLandingChecks(tag, fileTag, width, reduce);
+      await runTabChecks(tag, fileTag, width, reduce);
       await openFresh(`${ORIGIN}/#/app`);
 
       const mediaOk = await evaluate(`matchMedia('(prefers-reduced-motion: ${reduce ? 'reduce' : 'no-preference'})').matches`);
