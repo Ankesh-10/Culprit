@@ -266,6 +266,48 @@ const FILL_PROBE = `(() => {
   return JSON.stringify({ scale: match ? Number(match[1]) : (getComputedStyle(fill).transform === 'none' ? 1 : null) });
 })()`;
 
+const DECOR_PROBE = `(() => {
+  const stripes = document.querySelector('.header-stripes');
+  const ambient = document.querySelector('.ambient');
+  const spans = stripes ? [...stripes.children] : [];
+  return JSON.stringify({
+    stripesHidden: !!stripes && stripes.getAttribute('aria-hidden') === 'true',
+    spanCount: spans.length,
+    images: spans.map((span) => getComputedStyle(span).backgroundImage),
+    opacities: spans.map((span) => Number(getComputedStyle(span).opacity)),
+    ambientHidden: !!ambient && ambient.getAttribute('aria-hidden') === 'true',
+    ambientOpacity: ambient ? Number(getComputedStyle(ambient).opacity) : null,
+    ambientEvents: ambient ? getComputedStyle(ambient).pointerEvents : null,
+  });
+})()`;
+
+const CARD_PROBE = `(() => {
+  const card = document.querySelector('button[data-case-id="checkout-outage"]');
+  card.scrollIntoView({ block: 'center' });
+  const rect = card.getBoundingClientRect();
+  return JSON.stringify({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+})()`;
+
+const SPARK_PROBE = `(() => {
+  const line = document.querySelector('.case-card .sparkline-line');
+  const card = document.querySelector('button[data-case-id="checkout-outage"]');
+  return JSON.stringify({
+    dasharray: line ? getComputedStyle(line).strokeDasharray : null,
+    transform: line ? getComputedStyle(line).transform : null,
+    border: card ? getComputedStyle(card).borderTopColor : null,
+  });
+})()`;
+
+const TIMELINE_PROBE = `(() => {
+  const section = document.querySelector('section.timeline');
+  const line = document.querySelector('.timeline-svg .series-draw');
+  return JSON.stringify({
+    entered: !!section && section.classList.contains('motion-enter'),
+    drawing: !!section && section.classList.contains('motion-draw'),
+    pathLength: line ? line.getAttribute('pathLength') : null,
+  });
+})()`;
+
 const EXPECTED_TEXT = { hash: '2222222', score: '0.91', matches: 'Matches 5 of 5 errors' };
 
 let preview;
@@ -406,6 +448,40 @@ async function main() {
         await evaluate('document.activeElement.blur()');
       }
 
+      const decor = JSON.parse(await evaluate(DECOR_PROBE));
+      const stripesOk =
+        decor.stripesHidden && decor.spanCount === 3 && decor.images.every((image) => image === 'none') && decor.opacities.every((value) => value <= 0.5);
+      report(stripesOk ? 'PASS' : 'FAIL', `[${tag}] header stripes: aria-hidden ${decor.stripesHidden}, ${decor.spanCount} spans, background-image [${decor.images.join(', ')}], opacity [${decor.opacities.join(', ')}]`);
+      const ambientOk = decor.ambientHidden && decor.ambientOpacity !== null && decor.ambientOpacity <= 0.04 && decor.ambientEvents === 'none';
+      report(ambientOk ? 'PASS' : 'FAIL', `[${tag}] ambient layer: aria-hidden ${decor.ambientHidden}, opacity ${decor.ambientOpacity}, pointer-events ${decor.ambientEvents}`);
+
+      // Card hover: the border brightens and the sparkline draws in (motion only) and ends fully drawn.
+      try {
+        await poll('a case sparkline', () => evaluate(`!!document.querySelector('.case-card .sparkline-line')`), 5000, 100);
+        await sleep(300);
+        const point = JSON.parse(await evaluate(CARD_PROBE));
+        await evaluate(SAMPLER_RESET);
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
+        await sleep(reduce ? 400 : 150);
+        const hoverSample = JSON.parse(await evaluate(SAMPLER_READ));
+        if (reduce) {
+          report(hoverSample.max === 0 ? 'PASS' : 'FAIL', `[${tag}] card hover runs no animation (max ${hoverSample.max})`);
+        } else {
+          report(hoverSample.names.includes('motion-wipe') ? 'PASS' : 'FAIL', `[${tag}] card hover sweeps the sparkline in (animations: ${hoverSample.names.join(', ')})`);
+          await poll('the hover draw to settle', () => evaluate(SETTLED_NOW), 3000, 50);
+        }
+        await sleep(200);
+        const spark = JSON.parse(await evaluate(SPARK_PROBE));
+        report(spark.dasharray === 'none' && spark.transform === 'none' ? 'PASS' : 'FAIL', `[${tag}] hovered sparkline settles fully drawn (dasharray ${spark.dasharray}, transform ${spark.transform})`);
+        report(spark.border === 'rgb(205, 205, 205)' ? 'PASS' : 'FAIL', `[${tag}] hovered card border ${spark.border} (ink-2)`);
+        await screenshot(`hover-${fileTag}.png`, false);
+        await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 2, y: 2 });
+        await evaluate('window.scrollTo(0, 0)');
+        await sleep(200);
+      } catch (error) {
+        report('FAIL', `[${tag}] card hover: ${error.message}`);
+      }
+
       await evaluate(SAMPLER_RESET);
       await evaluate(`document.querySelector('button[data-case-id="checkout-outage"]').click()`);
       await poll(
@@ -429,6 +505,7 @@ async function main() {
         await sleep(700);
         const sampled = JSON.parse(await evaluate(SAMPLER_READ));
         report(sampled.max === 0 && !sampled.ghost && sampled.names.length === 0 ? 'PASS' : 'FAIL', `[${tag}] sampler after 700ms: max ${sampled.max}, ghost ${sampled.ghost}, names [${sampled.names.join(', ')}]`);
+        report(!sampled.drift ? 'PASS' : 'FAIL', `[${tag}] ambient drift not running`);
       } else {
         try {
           await poll('the entrance to settle', () => evaluate(SETTLED_NOW), 5000, 50);
@@ -442,6 +519,7 @@ async function main() {
         const missing = wanted.filter((name) => !sampled.names.includes(name));
         report(missing.length === 0 ? 'PASS' : 'FAIL', `[${tag}] animations seen: ${sampled.names.join(', ')}${missing.length ? `; missing ${missing.join(', ')}` : ''}`);
         report(sampled.ghost ? 'PASS' : 'FAIL', `[${tag}] roll overlay appeared`);
+        report(sampled.drift ? 'PASS' : 'FAIL', `[${tag}] ambient drift is running`);
       }
 
       await sleep(300);
@@ -456,6 +534,52 @@ async function main() {
       const fill = JSON.parse(await evaluate(FILL_PROBE));
       const fillOk = fill.scale !== null && Math.abs(fill.scale - 0.912065) < 0.002;
       report(fillOk ? 'PASS' : 'FAIL', `[${tag}] score fill scaleX ${fill.scale} (expected 0.912065)`);
+
+      // Timeline: scroll it into view, then the draw-in plays once; stepping never replays it.
+      try {
+        await evaluate(SAMPLER_RESET);
+        await evaluate(`document.querySelector('#timeline-title').scrollIntoView({ block: 'center' })`);
+        if (reduce) {
+          await sleep(600);
+          const sampled = JSON.parse(await evaluate(SAMPLER_READ));
+          report(sampled.max === 0 ? 'PASS' : 'FAIL', `[${tag}] timeline scrolled into view runs no animation (max ${sampled.max})`);
+        } else {
+          await poll('the timeline entrance to start', async () => JSON.parse(await evaluate(TIMELINE_PROBE)).entered, 4000, 30);
+          await poll('the timeline entrance to settle', () => evaluate(SETTLED_NOW), 8000, 50);
+          const sampled = JSON.parse(await evaluate(SAMPLER_READ));
+          const wanted = ['motion-draw-line', 'motion-wipe', 'motion-pop', 'motion-pulse'];
+          const missing = wanted.filter((name) => !sampled.names.includes(name));
+          report(missing.length === 0 ? 'PASS' : 'FAIL', `[${tag}] timeline animations: ${sampled.names.join(', ')}${missing.length ? `; missing ${missing.join(', ')}` : ''}`);
+        }
+        await sleep(200);
+        const timeline = JSON.parse(await evaluate(TIMELINE_PROBE));
+        report(!timeline.drawing ? 'PASS' : 'FAIL', `[${tag}] .timeline has released motion-draw after settling: ${!timeline.drawing}`);
+        report(timeline.pathLength === '1' ? 'PASS' : 'FAIL', `[${tag}] .series-draw pathLength ${timeline.pathLength}`);
+        await screenshot(`timeline-${fileTag}.png`, false);
+
+        await evaluate(`document.querySelector('.timeline-slider').focus()`);
+        await evaluate(SAMPLER_RESET);
+        const readoutBefore = await evaluate(`document.querySelector('.readout-text').textContent`);
+        await press('ArrowRight', 'ArrowRight', 39);
+        await sleep(60);
+        let readoutAfter = await evaluate(`document.querySelector('.readout-text').textContent`);
+        if (readoutAfter === readoutBefore) {
+          // The selection may already sit on the last interval: step the other way instead.
+          await evaluate(SAMPLER_RESET);
+          await press('ArrowLeft', 'ArrowLeft', 37);
+          await sleep(60);
+          readoutAfter = await evaluate(`document.querySelector('.readout-text').textContent`);
+        }
+        report(readoutAfter !== readoutBefore ? 'PASS' : 'FAIL', `[${tag}] a slider step changes the readout ("${readoutBefore.slice(0, 28)}" to "${readoutAfter.slice(0, 28)}")`);
+        await sleep(240);
+        const stepped = JSON.parse(await evaluate(SAMPLER_READ));
+        const replayed = stepped.names.filter((name) => ['motion-draw-line', 'motion-wipe', 'motion-pop', 'motion-pulse'].includes(name));
+        report(replayed.length === 0 ? 'PASS' : 'FAIL', `[${tag}] stepping the slider replays no draw-in (animations: [${stepped.names.join(', ')}])`);
+        if (reduce) report(stepped.max === 0 ? 'PASS' : 'FAIL', `[${tag}] stepping runs no animation under reduced motion`);
+        else report(stepped.names.some((name) => name.startsWith('motion-swap')) ? 'PASS' : 'FAIL', `[${tag}] the readout text fades on a step`);
+      } catch (error) {
+        report('FAIL', `[${tag}] timeline: ${error.message}`);
+      }
 
       const metrics = JSON.parse(await evaluate(PAGE_METRICS));
       report(metrics.bodyBackground === 'rgb(7, 8, 10)' ? 'PASS' : 'FAIL', `[${tag}] body background ${metrics.bodyBackground}`);
@@ -488,6 +612,7 @@ async function main() {
         const button = [...document.querySelectorAll('.verdict button')].find((entry) => (entry.getAttribute('aria-label') || entry.textContent || '').includes('Inspect evidence'));
         if (!button) return false;
         button.scrollIntoView({ block: 'center' });
+        window.__sampler.reset();
         button.click();
         return true;
       })()`);
@@ -497,6 +622,13 @@ async function main() {
         try {
           await poll('the drawer', () => evaluate(`document.querySelector('#suspect-drawer').hasAttribute('open')`), 5000);
           await sleep(400);
+          const drawerSample = JSON.parse(await evaluate(SAMPLER_READ));
+          if (reduce) {
+            report(drawerSample.max === 0 ? 'PASS' : 'FAIL', `[${tag}] drawer opens with no animation (max ${drawerSample.max})`);
+          } else {
+            const slid = drawerSample.names.some((name) => name === 'motion-drawer-in' || name === 'motion-drawer-up');
+            report(slid ? 'PASS' : 'FAIL', `[${tag}] drawer animates in (animations: ${drawerSample.names.join(', ')})`);
+          }
           const drawerMetrics = JSON.parse(await evaluate(PAGE_METRICS));
           const drawerOverflow = drawerMetrics.scrollWidth > drawerMetrics.innerWidth;
           report(drawerOverflow && width === 360 ? 'FAIL' : drawerOverflow ? 'WARN' : 'PASS', `[${tag}] drawer open: scrollWidth ${drawerMetrics.scrollWidth} vs innerWidth ${drawerMetrics.innerWidth}`);
@@ -504,9 +636,11 @@ async function main() {
           report(drawerStray.length === 0 ? 'PASS' : 'FAIL', `[${tag}] drawer font weights: ${drawerMetrics.weights.join(', ')}`);
           await screenshot(`culprit-${fileTag}-drawer.png`, false);
           await press('Escape', 'Escape', 27);
-          await sleep(300);
+          await sleep(60);
           const closed = await evaluate(`!document.querySelector('#suspect-drawer').hasAttribute('open')`);
-          report(closed ? 'PASS' : 'FAIL', `[${tag}] Escape closes the drawer`);
+          report(closed ? 'PASS' : 'FAIL', `[${tag}] Escape closes the drawer immediately`);
+          const returned = await evaluate(`(document.activeElement.textContent || '').includes('Inspect evidence')`);
+          report(returned ? 'PASS' : 'FAIL', `[${tag}] focus returns to the Inspect evidence button`);
         } catch (error) {
           report('FAIL', `[${tag}] drawer: ${error.message}`);
         }

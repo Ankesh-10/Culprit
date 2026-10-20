@@ -72,6 +72,16 @@
   --motion-draw: 900ms;
   --motion-drawer: 320ms;
 
+  /* Header stripe band and ambient dot grid (decorative, flat fills, aria-hidden). Opacities are capped by
+     tests/ui/contrast.test.ts so text over them keeps 4.5:1. */
+  --stripe-1: #ff5757;
+  --stripe-2: #e04848;
+  --stripe-3: #a1131a;
+  --stripe-1-opacity: 0.24;
+  --stripe-2-opacity: 0.32;
+  --stripe-3-opacity: 0.5;
+  --ambient-opacity: 0.04;
+
   color-scheme: dark;
 }
 
@@ -211,11 +221,53 @@ kbd {
 /* Header */
 
 .site-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-sm) var(--space-lg);
   min-height: 0;
+}
+
+/* One flat three-stripe band behind the header text: skewed rectangles, never a gradient or shadow. */
+.header-stripes {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: -1;
+  width: min(320px, 50%);
+  pointer-events: none;
+}
+
+.header-stripes span {
+  position: absolute;
+  top: -24px;
+  bottom: -24px;
+  width: 28px;
+  transform: skewX(-24deg);
+}
+
+.header-stripes span:nth-child(1) { right: 24px; background: var(--stripe-1); opacity: var(--stripe-1-opacity); }
+.header-stripes span:nth-child(2) { right: 72px; background: var(--stripe-2); opacity: var(--stripe-2-opacity); }
+.header-stripes span:nth-child(3) { right: 120px; background: var(--stripe-3); opacity: var(--stripe-3-opacity); }
+
+/* A faint fixed dot grid behind the page. Its single slow drift is gated (see the motion block). */
+.ambient {
+  position: fixed;
+  inset: -24px;
+  z-index: -1;
+  pointer-events: none;
+  opacity: var(--ambient-opacity);
+}
+
+.ambient-dot { fill: var(--color-ink); }
+
+@media print {
+  .ambient,
+  .header-stripes { display: none; }
 }
 
 @media (min-width: 1024px) {
@@ -360,7 +412,8 @@ kbd {
   cursor: pointer;
 }
 
-.case-card:hover { border-color: var(--color-ink-2); }
+.case-card:hover,
+.case-card:focus-visible { border-color: var(--color-ink-2); }
 
 .case-card.is-loaded,
 .case-toggle.is-loaded {
@@ -482,10 +535,23 @@ kbd {
 }
 
 .loading-placeholder {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   min-height: 120px;
   color: var(--color-ink-2);
+}
+
+/* A thin flat bar swept across the text-only placeholder; invisible unless the gated sweep plays. */
+.scanline {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 30%;
+  height: 2px;
+  background: var(--color-ink-2);
+  opacity: 0;
 }
 
 .loading-placeholder p { margin: 0; }
@@ -1300,6 +1366,16 @@ kbd {
 
 .marker-other { fill: none; stroke: var(--viz-context); stroke-width: 2; }
 
+/* One-shot pulse behind the leading marker; invisible at rest, so it only ever shows while the gated pulse plays. */
+.marker-pulse {
+  fill: none;
+  stroke: var(--viz-suspect);
+  stroke-width: 2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 .hover-crosshair { stroke-dasharray: none; opacity: 0.6; }
 
 .hatch-line { stroke: none; }
@@ -1736,7 +1812,8 @@ kbd {
 
 .trust-detail .is-mono { font-family: var(--font-mono); }
 
-/* Suspect drawer: a native modal dialog anchored right, full screen on phones, no animation. */
+/* Suspect drawer: a native modal dialog anchored right, full screen on phones. Opening slides it in over a
+   fading backdrop (gated, see the motion block); closing is instant so focus returns without a delay. */
 
 .suspect-drawer {
   position: fixed;
@@ -2142,6 +2219,9 @@ kbd {
   .drawer-nav-button:disabled { color: GrayText; border-color: GrayText; }
 
   .icon { forced-color-adjust: auto; color: CanvasText; }
+
+  .ambient,
+  .header-stripes { display: none; }
 }
 
 /* Motion (POLISH-02 early, quick 261020-ftp)
@@ -2197,4 +2277,134 @@ kbd {
     white-space: nowrap;
     pointer-events: none;
   }
+
+  /* Timeline: the line draws in, the onset band wipes in from its left edge, commit marks pop in and the
+     leading marker pulses once. Scoped to .timeline-svg so the legend keys never animate. The class is held
+     by src/ui/motion.ts only while the animations run, so stepping and resizing never replay it. */
+  @keyframes motion-draw-line {
+    from { stroke-dashoffset: 1; }
+  }
+
+  @keyframes motion-wipe {
+    from { transform: scaleX(0); }
+  }
+
+  @keyframes motion-pop {
+    from { opacity: 0; transform: scale(0); }
+  }
+
+  @keyframes motion-pulse {
+    0% { opacity: 0; transform: scale(1); }
+    10% { opacity: 0.8; transform: scale(1); }
+    100% { opacity: 0; transform: scale(2.4); }
+  }
+
+  @keyframes motion-swap-a {
+    from { opacity: 0; }
+  }
+
+  @keyframes motion-swap-b {
+    from { opacity: 0; }
+  }
+
+  .motion-draw .timeline-svg .series-draw {
+    stroke-dasharray: 1;
+    animation: motion-draw-line var(--motion-draw) var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger));
+  }
+
+  .motion-draw .timeline-svg .series-area {
+    animation: motion-fade var(--motion-draw) var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 300ms);
+  }
+
+  .motion-draw .timeline-svg .onset-band,
+  .motion-draw .timeline-svg .onset-bracket {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: motion-wipe 500ms var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 150ms);
+  }
+
+  .motion-draw .timeline-svg .marker-ring,
+  .motion-draw .timeline-svg .marker-leading,
+  .motion-draw .timeline-svg .marker-ranked,
+  .motion-draw .timeline-svg .marker-other {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: motion-pop 360ms var(--motion-ease-out) backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 300ms + var(--pop-index, 0) * 40ms);
+  }
+
+  .motion-draw .timeline-svg .marker-pulse {
+    animation: motion-pulse 900ms ease-out backwards;
+    animation-delay: calc(var(--index, 0) * var(--motion-stagger) + 800ms);
+  }
+
+  /* A filter change only crossfades the series; the readout text fades in on every change. */
+  .timeline-svg .is-crossfade {
+    animation: motion-fade 200ms ease-out backwards;
+  }
+
+  .readout-text.is-swap-a { animation: motion-swap-a var(--motion-fast) ease-out; }
+  .readout-text.is-swap-b { animation: motion-swap-b var(--motion-fast) ease-out; }
+
+  /* Case cards: hovering or focusing sweeps the sparkline in from its left edge. The line uses a
+     non-scaling stroke, which makes a dash-offset draw unreliable, so it wipes with scaleX instead. */
+  .case-card:hover .sparkline-line,
+  .case-card:focus-visible .sparkline-line {
+    transform-box: fill-box;
+    transform-origin: left center;
+    animation: motion-wipe 700ms var(--motion-ease-out) backwards;
+  }
+
+  /* First-load analysis: a thin scanline sweeps the text placeholder three times, then rests. */
+  @keyframes motion-scan {
+    from { opacity: 0.35; transform: translateX(-100%); }
+    to { opacity: 0.35; transform: translateX(340%); }
+  }
+
+  .scanline { animation: motion-scan 1200ms ease-in-out 3; }
+
+  /* Suspect drawer: slides in from the right (from below on phones) over a fading backdrop. */
+  @keyframes motion-drawer-in {
+    from { transform: translateX(100%); }
+  }
+
+  @keyframes motion-drawer-up {
+    from { opacity: 0; transform: translateY(24px); }
+  }
+
+  .suspect-drawer[open] {
+    animation: motion-drawer-in var(--motion-drawer) var(--motion-ease-out) backwards;
+  }
+
+  .suspect-drawer[open]::backdrop {
+    animation: motion-fade 200ms ease-out backwards;
+  }
+
+  @media (max-width: 639px) {
+    .suspect-drawer[open] {
+      animation: motion-drawer-up var(--motion-drawer) var(--motion-ease-out) backwards;
+    }
+  }
+
+  /* Header stripes enter once, staggered; the ambient dot grid drifts one pattern period over 48 s, the only
+     new loop (seamless because 24px is exactly the pattern size). */
+  @keyframes motion-stripe-in {
+    from { opacity: 0; transform: translateX(48px) skewX(-24deg); }
+  }
+
+  @keyframes motion-drift {
+    to { transform: translate(24px, 24px); }
+  }
+
+  .header-stripes span {
+    animation: motion-stripe-in 700ms var(--motion-ease-out) backwards;
+  }
+
+  .header-stripes span:nth-child(2) { animation-delay: 90ms; }
+  .header-stripes span:nth-child(3) { animation-delay: 180ms; }
+
+  .ambient { animation: motion-drift 48s linear infinite; }
 }

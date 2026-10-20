@@ -53,7 +53,10 @@ export function renderEmptyState(): HTMLElement {
 
 /** Text only: no skeleton shapes. */
 export function renderLoadingPlaceholder(): HTMLElement {
-  return el('div', { className: 'loading-placeholder' }, [el('p', { text: LOADING_LABEL })]);
+  return el('div', { className: 'loading-placeholder' }, [
+    el('p', { text: LOADING_LABEL }),
+    el('span', { className: 'scanline', attrs: { 'aria-hidden': 'true' } }),
+  ]);
 }
 
 export interface ErrorStateHandlers {

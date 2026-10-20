@@ -85,6 +85,29 @@ function startRoll(target: HTMLElement, delayMs: number): () => void {
   return finish;
 }
 
+/**
+ * The timeline draw-in is a class on its section for exactly as long as its animations run. The chart is
+ * redrawn from a resize observer straight after it mounts (replaced nodes restart under the still-present
+ * class), and once every animation under the section has ended the class is removed, so a later resize or
+ * filter redraw never replays the draw-in.
+ */
+function holdDrawIn(section: HTMLElement, cancels: Array<() => void>): void {
+  if (typeof section.getAnimations !== 'function') return;
+  section.classList.add('motion-draw');
+  const release = (): void => {
+    if (section.getAnimations({ subtree: true }).length > 0) return;
+    section.classList.remove('motion-draw');
+    stop();
+  };
+  const stop = (): void => {
+    section.removeEventListener('animationend', release);
+    section.removeEventListener('animationcancel', release);
+  };
+  section.addEventListener('animationend', release);
+  section.addEventListener('animationcancel', release);
+  cancels.push(stop);
+}
+
 /** Plays the staggered entrance for `sections`; a no-op scope when the user prefers reduced motion. */
 export function playEntrance(sections: readonly HTMLElement[]): MotionScope {
   if (!prefersMotion() || sections.length === 0) return NOOP_SCOPE;
@@ -97,6 +120,7 @@ export function playEntrance(sections: readonly HTMLElement[]): MotionScope {
     if (disposed) return;
     section.style.setProperty('--index', String(index));
     section.classList.add('motion-enter');
+    if (section.querySelector('.series-draw') !== null) holdDrawIn(section, cancels);
     const delay = index * MOTION_TIMING.staggerMs + MOTION_TIMING.rollDelayMs;
     for (const target of Array.from(section.querySelectorAll<HTMLElement>('[data-roll]'))) {
       cancels.push(startRoll(target, delay));

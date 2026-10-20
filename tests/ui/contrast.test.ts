@@ -29,6 +29,9 @@ const SPEC: Record<string, string> = {
   'viz-onset': '#d95926',
   'viz-suspect': '#199e70',
   'viz-context': '#8fa0b8',
+  'stripe-1': '#ff5757',
+  'stripe-2': '#e04848',
+  'stripe-3': '#a1131a',
 };
 
 function token(name: string): string | undefined {
@@ -361,6 +364,64 @@ function motionViolations(cssText: string): string[] {
 
   return problems;
 }
+
+describe('decorative layers keep text contrast (D-06, D-07, D-12)', () => {
+  /** Reads a plain number declaration such as `--stripe-1-opacity: 0.24;` from :root. */
+  function numberToken(name: string): number {
+    const match = new RegExp(`(?<![\\w-])--${name}\\s*:\\s*([0-9.]+)\\s*;`).exec(rootBlock);
+    if (match === null) throw new Error(`--${name} is missing from :root in src/styles.css`);
+    return Number(match[1]);
+  }
+
+  function rgbOf(hex: string): [number, number, number] {
+    return [Number.parseInt(hex.slice(1, 3), 16), Number.parseInt(hex.slice(3, 5), 16), Number.parseInt(hex.slice(5, 7), 16)];
+  }
+
+  const stripes = ['stripe-1', 'stripe-2', 'stripe-3'] as const;
+  /** Muted text over each stripe on the bare page, as recorded in the UI-SPEC. */
+  const MUTED_OVER_STRIPE = [5.42, 5.13, 5.29];
+  const page = value('color-page');
+  const ambientOpacity = numberToken('ambient-opacity');
+  const [inkR, inkG, inkB] = rgbOf(value('color-ink'));
+  const ambientOverPage = composite([inkR, inkG, inkB, ambientOpacity], page);
+
+  /** Every colour a stripe can sit on: the page, and the page with a dot of the ambient grid under it. */
+  function composites(stripe: (typeof stripes)[number]): Array<[string, string]> {
+    const [r, g, b] = rgbOf(value(stripe));
+    const opacity = numberToken(`${stripe}-opacity`);
+    return [
+      [`${stripe} over page`, composite([r, g, b, opacity], page)],
+      [`${stripe} over ambient dot`, composite([r, g, b, opacity], ambientOverPage)],
+    ];
+  }
+
+  it('keeps every stripe at 0.5 opacity or less and the ambient grid at 0.04 or less', () => {
+    for (const stripe of stripes) expect(numberToken(`${stripe}-opacity`)).toBeLessThanOrEqual(0.5);
+    expect(ambientOpacity).toBeLessThanOrEqual(0.04);
+  });
+
+  it('keeps ink, ink-2 and muted text at 4.5:1 or better over each stripe and over the ambient dot', () => {
+    const failures: string[] = [];
+    for (const stripe of stripes) {
+      for (const [label, background] of composites(stripe)) {
+        for (const foreground of ['color-ink', 'color-ink-2', 'color-muted']) {
+          const result = ratio(value(foreground), background);
+          if (result < 4.5) failures.push(`${foreground} on ${label}: ${round2(result)}`);
+        }
+      }
+    }
+    for (const foreground of ['color-ink', 'color-ink-2', 'color-muted']) {
+      const result = ratio(value(foreground), ambientOverPage);
+      if (result < 4.5) failures.push(`${foreground} on the ambient dot: ${round2(result)}`);
+    }
+    expect(failures).toEqual([]);
+  });
+
+  it('records the muted-text figures quoted in the UI-SPEC', () => {
+    const figures = stripes.map((stripe) => round2(ratio(value('color-muted'), composites(stripe)[0]?.[1] ?? page)));
+    expect(figures).toEqual(MUTED_OVER_STRIPE);
+  });
+});
 
 describe('gated motion (D-09, D-10, D-12)', () => {
   const GATE = '@media (prefers-reduced-motion: no-preference)';

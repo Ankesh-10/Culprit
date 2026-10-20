@@ -307,8 +307,14 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     }
   }
 
-  function draw(): void {
+  /**
+   * Rebuilds the whole SVG. `cause` only decides motion: 'filter' crossfades the series paths; 'build' and
+   * 'resize' add nothing (the first-render draw-in is a class the entrance adds to the section, so a resize
+   * redraw while it is playing just restarts the new nodes and a later one never replays it).
+   */
+  function draw(cause: 'build' | 'resize' | 'filter' = 'resize'): void {
     if (domain === null) return;
+    const fade = cause === 'filter' ? ' is-crossfade' : '';
     const viewport = viewportWidth(width);
     const plotWidth = Math.max(80, width - PAD_LEFT - PAD_RIGHT);
     const plotHeight = plotHeightFor(viewport);
@@ -361,16 +367,16 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     // Series.
     if (series.filtered === null) {
       plot.append(
-        svgEl('path', { class: 'series-area', d: geometry.areaPath }),
-        svgEl('path', { class: 'series-line', d: geometry.linePath }),
+        svgEl('path', { class: `series-area${fade}`, d: geometry.areaPath }),
+        svgEl('path', { class: `series-line series-draw${fade}`, d: geometry.linePath, pathLength: '1' }),
       );
     } else {
       // Emphasis form: the total in context gray without a wash, the selected signature in the series blue with it.
       const emphasised = buildPlotGeometry(stream.timeline, series.filtered, domain, plotWidth, plotHeight, yMax);
       plot.append(
-        svgEl('path', { class: 'series-line context-line', d: geometry.linePath }),
-        svgEl('path', { class: 'series-area', d: emphasised.areaPath }),
-        svgEl('path', { class: 'series-line', d: emphasised.linePath }),
+        svgEl('path', { class: `series-line context-line${fade}`, d: geometry.linePath }),
+        svgEl('path', { class: `series-area${fade}`, d: emphasised.areaPath }),
+        svgEl('path', { class: `series-line series-draw${fade}`, d: emphasised.linePath, pathLength: '1' }),
       );
     }
 
@@ -396,7 +402,8 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     const markers = commitMarkers(scale, domain, stream.commits, stream.ranking.suspects);
     const drawOrder = (marker: CommitMarker): number => (marker.kind === 'leading' ? 2 : marker.kind === 'ranked' ? 1 : 0);
     const laneMarks: SVGElement[] = [];
-    for (const marker of [...markers].sort((a, b) => drawOrder(a) - drawOrder(b))) {
+    const popIndexOf = (order: number): string => String(Math.min(order, 8));
+    [...markers].sort((a, b) => drawOrder(a) - drawOrder(b)).forEach((marker, order) => {
       if (marker.kind === 'leading') {
         laneMarks.push(
           svgEl('line', {
@@ -408,14 +415,18 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
           }),
         );
       }
-      laneMarks.push(
-        svgEl('polygon', { class: 'marker-ring', points: diamondPoints(marker.x, laneCenter, marker.size + 4) }),
-        svgEl('polygon', {
-          class: marker.kind === 'leading' ? 'marker-leading' : marker.kind === 'ranked' ? 'marker-ranked' : 'marker-other',
-          points: diamondPoints(marker.x, laneCenter, marker.size),
-          'data-sha': marker.shortSha,
-        }),
-      );
+      const ringPoints = diamondPoints(marker.x, laneCenter, marker.size + 4);
+      // A decorative one-shot pulse ring behind the leading marker; invisible unless the gated pulse plays.
+      if (marker.kind === 'leading') laneMarks.push(svgEl('polygon', { class: 'marker-pulse', points: ringPoints }));
+      const ringMark = svgEl('polygon', { class: 'marker-ring', points: ringPoints });
+      const mainMark = svgEl('polygon', {
+        class: marker.kind === 'leading' ? 'marker-leading' : marker.kind === 'ranked' ? 'marker-ranked' : 'marker-other',
+        points: diamondPoints(marker.x, laneCenter, marker.size),
+        'data-sha': marker.shortSha,
+      });
+      ringMark.style.setProperty('--pop-index', popIndexOf(order));
+      mainMark.style.setProperty('--pop-index', popIndexOf(order));
+      laneMarks.push(ringMark, mainMark);
       if (marker.label !== null && marker.rank !== null) {
         const labelWidth = estimateLabelWidth(marker.label);
         const right = marker.x + marker.size / 2 + LABEL_FONT_PADDING;
@@ -424,7 +435,7 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
         labelCandidates.push({ id, priority: marker.rank === 1 ? 1 : 2, x, y: laneCenter - LABEL_HEIGHT / 2, width: labelWidth, height: LABEL_HEIGHT });
         labelText.set(id, { text: marker.label, className: marker.rank === 1 ? 'chart-label is-strong' : 'chart-label is-ink' });
       }
-    }
+    });
 
     plot.append(...laneMarks, crosshair, hoverLine, ring);
 
@@ -555,11 +566,23 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
     layout.ring.setAttribute('cy', String(y));
   }
 
+  let readoutShown = false;
+
   function syncReadout(): void {
     const readout = buildReadout(stream, state);
     slider.setAttribute('aria-valuenow', String(state.selectedIndex));
     slider.setAttribute('aria-valuetext', readout.valueText);
-    readoutText.textContent = readout.text;
+    if (readoutText.textContent !== readout.text) {
+      readoutText.textContent = readout.text;
+      // Alternate two classes so the 150 ms fade restarts on each change without a forced reflow; the first
+      // text of a result is part of the entrance and does not swap.
+      if (readoutShown) {
+        const next = readoutText.classList.contains('is-swap-a') ? 'is-swap-b' : 'is-swap-a';
+        readoutText.classList.remove('is-swap-a', 'is-swap-b');
+        readoutText.classList.add(next);
+      }
+    }
+    readoutShown = true;
     logButton.textContent = readout.logButtonLabel;
   }
 
@@ -602,7 +625,7 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
   syncFilter();
   syncReadout();
   renderTwinRows();
-  draw();
+  draw('build');
 
   let observer: ResizeObserver | null = null;
   if (typeof ResizeObserver === 'function') {
@@ -626,7 +649,7 @@ export function renderTimeline(stream: AnalysisStream, initial: InvestigationSta
         // The chart, legend, chip and table twin all re-render against the same filter.
         hideTooltip();
         syncFilter();
-        draw();
+        draw('filter');
         renderTwinRows();
         return;
       }
