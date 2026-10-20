@@ -104,6 +104,19 @@ Ranking is a frozen, explainable heuristic (`scoring-v1`). It never uses a model
 - **Confidence band and labels.** A separation below 0.05 between the top two scores, or an ambiguous onset, is labeled `ambiguous`. Fewer than half of the error events matching a changed line is labeled `weak-evidence`. `ambiguous` together with `weak-evidence` is labeled `no-clear-culprit`. Any of these puts the band at low and adds `low-confidence`. Otherwise a gradual ramp, a separation below 0.15, or application stack frames on fewer than three quarters of the error events cap the band at medium; everything else is high.
 - **Export.** The Markdown export escapes all supplied text (commit subjects, authors, log-derived details, diagnostics) so it cannot add headings, links, HTML, or extra lines. Every ranked report states that scores are ranked suspicion, not probability or proof of causality.
 
+## Using the console
+
+Open the page and choose one of the three bundled incidents; one click loads and analyzes it. The checkout case is a sharp spike, the slow-burn case is a gradual ramp, and the ambiguous case has no clear culprit. A result shows the most likely suspect with its evidence, a short lineup, a timeline of errors with the onset and suspect commits, a signature table, and a trust footer with warnings and limits. "Inspect evidence" opens the suspect drawer, and "Copy Markdown postmortem" copies the report. When the clipboard is unavailable (for example a plain-HTTP address that is not localhost), the Markdown appears in a selected text box so it can be copied by hand; "Hide Markdown" collapses it.
+
+To analyze your own incident, choose "Use your own files". The form has two fields:
+
+- **Log**: a JSON-lines or plain-text log (`.jsonl`, `.log`, `.txt`). The format is auto-detected by a fixed rule: when the first non-empty line starts with `{` it is read as JSON-lines, otherwise as plain text. The detected format is shown beside the format choice, which you can override.
+- **Git history**: a Culprit JSON history export (`.json`) as described under the supported input boundary. Raw `git log` output is not accepted.
+
+Each field takes a chosen file, a dropped file, or pasted text under "Or paste text". The limits are 1 MiB of log text, 10,000 events and 100 stack lines per event. A file over 1 MiB is refused before it is read, with a message naming its size. "Analyze incident" stays disabled until both fields have content. If an analysis fails, the page lists each problem in plain language with a "Fix input" link that moves focus to the field to fix, and your inputs stay filled. "Clear inputs" asks for confirmation first and leaves any shown result in place. Files and pasted text are processed in the page only; nothing is uploaded or stored.
+
+Keyboard use: Tab reaches every control, including the file pickers (Enter or Space opens them), and the focus ring is always visible. On the timeline slider, Left and Right move one step, PageUp and PageDown move a larger step, Home and End jump to the ends, and Enter opens the log lines for the selected interval. Escape closes the suspect drawer and returns focus to the control that opened it, and cancels the Clear inputs confirmation.
+
 ## Limitations
 
 Culprit narrows investigation; it does not roll back code, auto-fix a deployment, establish causality, or replace human review. The parser, onset detector, evidence ranking, and Markdown export are implemented; the worker and investigation console are still pending. Those later phases must consume the same fixture files and preserve the local privacy, UTC, determinism, confidence, and rebuild contracts documented here.
@@ -116,3 +129,5 @@ Ranking limits:
 - The onset window can start after the first error; the onset heuristics are unchanged by ranking.
 - History size is not capped yet.
 - Timelines over 10,000 buckets are rejected with an input-limit error.
+
+Font note: the UI ships with system font stacks. To use Geist instead, add the Geist WOFF2 files and `OFL.txt` under `src/assets/fonts` (see `FONTS.md` in that folder); the build bundles them locally and never loads fonts from a network.

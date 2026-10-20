@@ -1,6 +1,7 @@
 import { DEFAULT_LOG_LIMITS } from '../core/log-parser';
 import type { AnalysisInput, LogFormat } from '../core/model';
 import { normalizeRepositoryPath } from '../core/normalization';
+import { formatMiB } from './format';
 
 /**
  * Pure helpers for the own-files path: format detection, source naming and input assembly. Nothing
@@ -85,3 +86,25 @@ export function resultLabel(draft: OwnInputDraft): string {
 }
 
 export const MAX_INPUT_FILE_BYTES: number = DEFAULT_LOG_LIMITS.maxLogBytes;
+
+/** A file over the limit is refused from `File.size` before any bytes are read into memory. */
+export function checkFileSize(file: { name: string; size: number }): string | null {
+  if (file.size <= MAX_INPUT_FILE_BYTES) return null;
+  return `${file.name} is ${formatMiB(file.size)}. The limit is 1 MiB. Trim the file to the incident window and choose it again.`;
+}
+
+/** Sizes below 1 KiB show in bytes, below 1 MiB in KiB, otherwise in MiB; one decimal, no locale API. */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return formatMiB(bytes);
+}
+
+export function detectedFormatLabel(format: LogFormat): string {
+  return format === 'jsonl' ? 'Detected: JSON-lines' : 'Detected: Plain text';
+}
+
+/** `file-name · size`, never truncated; the CSS wraps it instead. */
+export function fileChipText(file: { fileName: string; fileSize: number }): string {
+  return `${file.fileName} · ${formatFileSize(file.fileSize)}`;
+}

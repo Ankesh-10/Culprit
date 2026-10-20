@@ -87,6 +87,11 @@ export function mountApp(doc: Document): void {
       draft = next;
     },
     onAnalyze: () => analyzeOwn(),
+    onClear: () => {
+      draft = emptyDraft();
+      ownForm.sync(draft);
+      dispatch({ type: 'cleared' });
+    },
   });
   ownHost.append(ownForm.element);
 
