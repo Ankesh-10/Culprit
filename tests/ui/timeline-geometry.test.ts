@@ -193,6 +193,47 @@ describe('commitMarkers', () => {
     expect(markers[2]?.x).toBeCloseTo(1000, 2);
   });
 
+  it('keeps at most one non-suspect marker per pixel column for thousands of commits', () => {
+    const wide = { startMs: 0, endMs: 3_000_000 };
+    const wideScale = createXScale(wide, 1000);
+    const commits = Array.from({ length: 3000 }, (_unused, index) => ({
+      sha: (index + 1).toString(16).padStart(40, '0'),
+      timestampUtc: iso(index * 1000),
+    }));
+    const suspects = [
+      { rank: 1, sha: commits[1500]?.sha ?? '', shortSha: '1500001' },
+      { rank: 2, sha: commits[700]?.sha ?? '', shortSha: '0700001' },
+      { rank: 3, sha: commits[2200]?.sha ?? '', shortSha: '2200001' },
+    ];
+    const markers = commitMarkers(wideScale, wide, commits, suspects);
+    const others = markers.filter((marker) => marker.kind === 'other');
+    const priority = markers.filter((marker) => marker.kind !== 'other');
+    expect(others.length).toBeLessThanOrEqual(1001);
+    expect(new Set(others.map((marker) => Math.round(marker.x))).size).toBe(others.length);
+    const taken = new Set(priority.map((marker) => Math.round(marker.x)));
+    expect(others.some((marker) => taken.has(Math.round(marker.x)))).toBe(false);
+    expect(priority.map((marker) => [marker.kind, marker.rank])).toEqual([
+      ['ranked', 2],
+      ['leading', 1],
+      ['ranked', 3],
+    ]);
+    const times = markers.map((marker) => Date.parse(commits.find((commit) => commit.sha === marker.sha)?.timestampUtc ?? ''));
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+  });
+
+  it('keeps the earlier commit, then the smaller sha, when two others share a column', () => {
+    const wide = { startMs: 0, endMs: 1_000_000 };
+    const wideScale = createXScale(wide, 1000);
+    const commits = [
+      { sha: 'b'.repeat(40), timestampUtc: iso(100_100) },
+      { sha: 'a'.repeat(40), timestampUtc: iso(100_100) },
+      { sha: 'c'.repeat(40), timestampUtc: iso(100_300) },
+      { sha: 'd'.repeat(40), timestampUtc: iso(500_000) },
+    ];
+    const markers = commitMarkers(wideScale, wide, commits, []);
+    expect(markers.map((marker) => marker.sha[0])).toEqual(['a', 'd']);
+  });
+
   it('produces no marker for a commit outside the domain', () => {
     const outside = [
       ...CHECKOUT.commits,

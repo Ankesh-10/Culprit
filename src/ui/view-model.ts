@@ -240,6 +240,29 @@ export function buildConsideredRows(stream: AnalysisStream): { summary: string; 
   return { summary: `Commits considered (${rows.length})`, rows };
 }
 
+/** Rows of 'Commits considered' rendered per page; the rest stay reachable through 'Show next 100'. */
+export const CONSIDERED_PAGE_SIZE = 100;
+
+export interface ConsideredPage {
+  rows: ConsideredRow[];
+  total: number;
+  hasMore: boolean;
+  /** 'Showing X of N commits' while more rows remain, else null. */
+  countText: string | null;
+}
+
+/** The first `visible` rows in input order, with the true total; nothing is re-sorted, sampled or dropped. */
+export function pageConsidered(rows: readonly ConsideredRow[], visible: number): ConsideredPage {
+  const shown = rows.slice(0, Math.max(0, visible));
+  const hasMore = rows.length > shown.length;
+  return {
+    rows: shown,
+    total: rows.length,
+    hasMore,
+    countText: hasMore ? `Showing ${formatInteger(shown.length)} of ${formatInteger(rows.length)} commits` : null,
+  };
+}
+
 export type StatusIcon = 'info' | 'loader' | 'x-circle' | 'alert-triangle' | 'check-circle';
 export type StatusTone = 'neutral' | 'good' | 'warning' | 'critical';
 

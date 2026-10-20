@@ -1,5 +1,6 @@
 import { el, icon } from './dom';
 import { renderScoreMeter } from './verdict';
+import { CONSIDERED_PAGE_SIZE, pageConsidered } from './view-model';
 import type { ConsideredRow, ShortlistRow, ShortlistView } from './view-model';
 
 const SCORE_CAPTION = 'rounded for display';
@@ -68,6 +69,9 @@ function renderConsideredRow(row: ConsideredRow): HTMLElement {
 }
 
 export function renderConsidered(view: { summary: string; rows: readonly ConsideredRow[] }): HTMLElement {
+  let visible = CONSIDERED_PAGE_SIZE;
+  const first = pageConsidered(view.rows, visible);
+  const tbody = el('tbody', {}, first.rows.map(renderConsideredRow));
   const table = el('table', { className: 'considered-table' }, [
     el('thead', {}, [
       el(
@@ -76,10 +80,32 @@ export function renderConsidered(view: { summary: string; rows: readonly Conside
         CONSIDERED_COLUMNS.map((name) => el('th', { text: name, attrs: { scope: 'col' } })),
       ),
     ]),
-    el('tbody', {}, view.rows.map(renderConsideredRow)),
+    tbody,
   ]);
-  return el('details', { className: 'considered' }, [
-    el('summary', { text: view.summary }),
-    el('div', { className: 'table-scroll', attrs: { role: 'region', 'aria-label': 'Commits considered', tabindex: '0' } }, [table]),
-  ]);
+  const scroll = el('div', { className: 'table-scroll', attrs: { role: 'region', 'aria-label': 'Commits considered', tabindex: '0' } }, [table]);
+  const details = el('details', { className: 'considered' }, [el('summary', { text: view.summary }), scroll]);
+  if (!first.hasMore) return details;
+
+  const count = el('p', { className: 'log-count', text: first.countText ?? '' });
+  const more = el('button', {
+    className: 'button-secondary',
+    text: 'Show next 100',
+    attrs: { type: 'button', 'data-focus-id': 'considered-more' },
+  });
+  more.addEventListener('click', () => {
+    const previous = visible;
+    visible += CONSIDERED_PAGE_SIZE;
+    const page = pageConsidered(view.rows, visible);
+    tbody.append(...page.rows.slice(previous).map(renderConsideredRow));
+    if (page.hasMore) {
+      count.textContent = page.countText ?? '';
+      return;
+    }
+    // The last page is in: drop the count and the button, and keep keyboard focus on the table region.
+    count.remove();
+    more.remove();
+    scroll.focus();
+  });
+  details.append(count, more);
+  return details;
 }

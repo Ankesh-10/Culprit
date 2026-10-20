@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { AnalysisInput, AnalysisStream } from '../../src/core/model';
 import { findCase, toAnalysisInput } from '../../src/ui/cases';
 import { analyze } from '../../src/core/pipeline';
-import { buildConsideredRows, buildErrorSummary, buildShortlistView, buildTrustFooterView, buildVerdictView } from '../../src/ui/view-model';
+import {
+  CONSIDERED_PAGE_SIZE,
+  buildConsideredRows,
+  buildErrorSummary,
+  buildShortlistView,
+  buildTrustFooterView,
+  buildVerdictView,
+  pageConsidered,
+} from '../../src/ui/view-model';
+import type { ConsideredRow } from '../../src/ui/view-model';
 import { buildOwnAnalysisInput, emptyDraft, sourcesFor } from '../../src/ui/intake';
 import type { AnalysisFailure } from '../../src/worker/protocol';
 import { handleAnalyzeRequest } from '../../src/worker/protocol';
@@ -180,6 +189,49 @@ describe('buildConsideredRows', () => {
     );
     const row = buildConsideredRows(stream).rows.find((entry) => entry.shortSha === '3333333');
     expect(row).toMatchObject({ rank: '4', status: 'Scored', score: '0.12', reason: '' });
+  });
+});
+
+describe('pageConsidered', () => {
+  function rowsOf(count: number): ConsideredRow[] {
+    return Array.from({ length: count }, (_unused, index) => ({
+      rank: String(index + 1),
+      shortSha: index.toString(16).padStart(7, '0'),
+      subject: `commit ${index}`,
+      status: 'Scored' as const,
+      score: '0.10',
+      reason: '',
+    }));
+  }
+
+  it('pages 250 rows 100 at a time and states the true total', () => {
+    expect(CONSIDERED_PAGE_SIZE).toBe(100);
+    const first = pageConsidered(rowsOf(250), 100);
+    expect(first.rows).toHaveLength(100);
+    expect(first.total).toBe(250);
+    expect(first.hasMore).toBe(true);
+    expect(first.countText).toBe('Showing 100 of 250 commits');
+    expect(pageConsidered(rowsOf(250), 200).rows).toHaveLength(200);
+    const last = pageConsidered(rowsOf(250), 300);
+    expect(last.rows).toHaveLength(250);
+    expect(last.hasMore).toBe(false);
+    expect(last.countText).toBeNull();
+  });
+
+  it('handles an empty list and every bundled case without a next page', () => {
+    expect(pageConsidered([], 100)).toEqual({ rows: [], total: 0, hasMore: false, countText: null });
+    for (const stream of [CHECKOUT, SLOW_BURN, AMBIGUOUS]) {
+      const view = pageConsidered(buildConsideredRows(stream).rows, CONSIDERED_PAGE_SIZE);
+      expect(view.hasMore).toBe(false);
+      expect(view.countText).toBeNull();
+    }
+  });
+
+  it('keeps the input order and formats large totals with separators', () => {
+    const rows = rowsOf(3000);
+    const view = pageConsidered(rows, 100);
+    expect(view.rows.map((row) => row.shortSha)).toEqual(rows.slice(0, 100).map((row) => row.shortSha));
+    expect(view.countText).toBe('Showing 100 of 3,000 commits');
   });
 });
 

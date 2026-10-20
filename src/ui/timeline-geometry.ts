@@ -238,7 +238,7 @@ export function commitMarkers(
     .map((commit) => ({ commit, at: Date.parse(commit.timestampUtc) }))
     .filter(({ at }) => at >= domain.startMs && at <= domain.endMs)
     .sort((left, right) => left.at - right.at || (left.commit.sha < right.commit.sha ? -1 : left.commit.sha > right.commit.sha ? 1 : 0));
-  return placed.map(({ commit, at }): CommitMarker => {
+  const markers = placed.map(({ commit, at }): CommitMarker => {
     const suspect = byShaRank.get(commit.sha);
     const shortSha = suspect?.shortSha ?? commit.sha.slice(0, 7);
     const x = scale.toX(at);
@@ -249,6 +249,16 @@ export function commitMarkers(
       return { sha: commit.sha, shortSha, kind: 'ranked', rank: suspect.rank, size: 12, label: `#${suspect.rank}`, x };
     }
     return { sha: commit.sha, shortSha, kind: 'other', rank: null, size: 8, label: null, x };
+  });
+  // Bound the lane: the top three are always drawn, and an 'other' marker only claims a pixel column that no
+  // earlier marker holds. The full commit list stays in 'Commits considered' and the data table.
+  const taken = new Set(markers.filter((marker) => marker.kind !== 'other').map((marker) => Math.round(marker.x)));
+  return markers.filter((marker) => {
+    if (marker.kind !== 'other') return true;
+    const column = Math.round(marker.x);
+    if (taken.has(column)) return false;
+    taken.add(column);
+    return true;
   });
 }
 
