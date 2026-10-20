@@ -1,14 +1,14 @@
 ---
 gsd_state_version: "1.0"
 status: executing
-stopped_at: Phase 04 complete, ready to plan Phase 5
-last_updated: "2026-10-20T04:59:57.751Z"
-state_head: 17e5d6111402dbe107ee44646c0425d6cedcdfed
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-10-20T12:21:40.799Z"
+state_head: 6a0a25a867a537c3d16bb6fdb026f0f0ae6ef11b
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 16
-  completed_plans: 16
+  total_plans: 20
+  completed_plans: 17
   percent: 80
 current_phase: 5
 current_phase_name: Hardening and Conditional Polish
@@ -58,6 +58,8 @@ current_phase_name: Hardening and Conditional Polish
 - [Phase 04]: 04-07: copy feedback resets on new result, drawer open/step/close; no timer; Hide Markdown returns focus to the copy button
 - [Phase 04]: 04-07: trust footer count chip counts warnings plus diagnostics; clean results show 'No warnings or diagnostics were reported.'
 - [Phase 04]: 04-08: own-file reads and the Clear inputs confirmation live in inputs.ts; app.ts holds only the draft and dispatches start/cleared
+- [Phase 05]: Docker runtime serves dist/ via tested scripts/serve-dist.mjs (CSP connect-src none, nosniff, no-referrer, USER node) instead of the inline server that sent index.html as a download
+- [Phase 05]: Pin LF via .gitattributes; Docker image proof is delegated to the CI run (05-DOCKER-EVIDENCE.md still pending)
 
 ## Blockers
 
@@ -76,8 +78,8 @@ All 8 Phase 4 plans are executed and the human walk-through is approved. Next: v
 
 ## Session Continuity
 
-**Last session:** 2026-10-20T04:55:50.251Z
-**Stopped at:** Phase 04 complete, ready to plan Phase 5
+**Last session:** 2026-10-20T12:21:40.289Z
+**Stopped at:** Completed 05-01-PLAN.md
 **Resume file:** None
 
 - **Last session:** 2026-10-19 — Phase 2 implementation and verification completed.
@@ -102,3 +104,4 @@ All 8 Phase 4 plans are executed and the human walk-through is approved. Next: v
 | Phase 04 P06 | 8 min | 2 tasks | 9 files |
 | Phase 04 P07 | 15 min | 2 tasks | 11 files |
 | Phase 04 P08 | 40 min | 3 tasks | 10 files |
+| Phase 05 P01 | 6 min | 2 tasks | 8 files |
