@@ -209,7 +209,10 @@ export function lineupPart(stream: AnalysisStream, prefix: string): PreviewPart 
   const view = buildShortlistView(stream);
   const leading = view?.rows[0];
   if (view === null || leading === undefined) return null;
-  const node = prepareRendered(renderShortlist(view, { onInspect: NO_OP }), prefix);
+  const lineup = renderShortlist(view, { onInspect: NO_OP });
+  // The Inspect buttons would only be inert look-alikes here; the drawer preview shows what they open.
+  for (const actions of Array.from(lineup.querySelectorAll('.lineup-actions'))) actions.remove();
+  const node = prepareRendered(lineup, prefix);
   return { node, summary: `Suspect lineup: ${view.countText}, led by ${leading.shortSha} with a score of ${leading.scoreText}.` };
 }
 

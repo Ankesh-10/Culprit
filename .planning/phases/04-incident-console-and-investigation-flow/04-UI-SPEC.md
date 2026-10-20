@@ -399,6 +399,24 @@ Added by quick task 261020-ftp. It implements part of POLISH-02 early (global sh
 
 ---
 
+## Landing View
+
+Added by quick task 261020-gzd. A second view in the same `index.html`; the console contract in every other section is unchanged.
+
+**Routes.** `#/` (and the empty hash) shows the landing; `#/app` shows the console; any other `#/...` value shows the landing. A plain `#fragment` resolves to the view that contains the element with that id. Every "Open the console" control sets the hash, both headers carry a Home and Console link pair (`aria-current="page"` on the active one), and back, forward and a `#/app` deep link work. On a view change focus moves to `#landing-title` or `#input-title` (both `tabindex="-1"`), `document.title` switches between "Culprit: find the commit that broke it" and "Culprit — Incident analysis", and `#route-status` (polite) announces "Home page" or "Console". Initial load moves no focus. Leaving the console closes an open suspect drawer. The console's idle case-card sparkline analysis runs on the first console show, not on the landing. The command palette (`/`, Ctrl/Cmd+K) works from both views and opens the console first.
+
+**Hero.** H1 "Which commit broke production?" with one supporting sentence, a white primary "Try the checkout outage" (opens the console and loads that case), a secondary "Open the console", a `/` hint and a live result card (hash 2222222, score 0.91) computed in the browser from the bundled checkout fixture. Headline sizes: `--text-hero` 64px at 1024px and wider (the one landing-only size), `--text-display` 48px from 640px to 1023px, `--text-heading` 24px below 640px, all at the display leading and weight 500; the headline never exceeds two lines from 320px to 1440px. The flat stripe band is reused behind the card (card surface is opaque). Console typography is unchanged.
+
+**Feature tabs.** Six tabs (`onset`, `suspects`, `timeline`, `drawer`, `postmortem`, `offline`) follow the WAI-ARIA tabs pattern: roving tabindex, ArrowLeft/ArrowRight/Home/End with wrap-around, automatic activation, `aria-selected`, `aria-controls`, panels labelled by their tab. The static markup shows all six panels as plain sections, so they read without JavaScript. Each panel has a preview frame (`role="region"` with an `aria-label`, caption "Live preview · bundled fixtures", a visually hidden summary) built by the shipped renderers from the bundled fixtures. Renderer previews are inert, never in the tab order, with ids prefixed by `feature-ID-` and the focus hooks (`data-suspect-rank`, `data-focus-id`, `data-roll`) removed so the live console's lookups are unaffected. The scoring weights and input limits quoted in the copy come from `SCORING_V1` and `DEFAULT_LOG_LIMITS`; `tests/ui/landing-copy.test.ts` pins them.
+
+**Scroll demo ("See it work").** Five real text steps (`inputs`, `onset`, `suspects`, `evidence`, `postmortem`), each with a preview frame. Three modes: scrolly (motion allowed, 640px and wider: a sticky stage pins the frames while the steps scroll past, `scrollProgress` and `stepAt` in `src/ui/landing-model.ts` map scroll position to the active step, and the stage animates the active step), reveal (motion allowed, narrower: stacked, each frame animates once when it enters the viewport) and static (reduced motion). `watchScroll` in `src/ui/motion.ts` is an IntersectionObserver-gated passive scroll listener (plus a resize listener) that allows at most one pending animation frame; the listeners exist only while the demo is in view and are removed on `stop()`. It never prevents a default, snaps or moves the scroll position, so the page always scrolls freely past the demo. Only `transform`, `opacity` and `stroke-dashoffset` animate.
+
+**Reduced-motion contract.** Under `prefers-reduced-motion: reduce` the landing runs zero animations: the hero card shows its exact values at once, the tab panel swap is instant and the demo is the stacked sequence of five steps with static final previews. All landing motion sits inside `@media (prefers-reduced-motion: no-preference)`.
+
+**Narrow test additions.** `tests/ui/static-safety.test.ts` now also requires that scroll listeners appear only in `src/ui/motion.ts` and only as passive listeners; the animation-frame allow-list is unchanged (`src/ui/motion.ts` only). `tests/ui/contrast.test.ts` pins the landing pairs: `--color-ink-2` over `--color-grid` at 3:1 or better (progress and weight bars), and `--color-muted`, `--color-ink-2` and `--color-ink` over the page and surface at 4.5:1 or better (tab labels, captions, step text).
+
+---
+
 ## Interaction and State Contract
 
 ### Page state machine

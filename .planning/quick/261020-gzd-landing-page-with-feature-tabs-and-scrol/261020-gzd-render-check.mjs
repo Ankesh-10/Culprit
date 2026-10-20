@@ -884,6 +884,208 @@ async function main() {
     }
   };
 
+  const DEMO_IDS = ['inputs', 'onset', 'suspects', 'evidence', 'postmortem'];
+
+  const DEMO_PROBE = `(() => {
+    const section = document.querySelector('#demo');
+    const stage = section.querySelector('.demo-stage');
+    const steps = [...section.querySelectorAll('[data-demo-step]')];
+    const active = steps.filter((step) => step.classList.contains('is-active')).map((step) => step.dataset.demoStep);
+    const stageFrames = [...stage.querySelectorAll(':scope > .preview-frame')];
+    const shown = stageFrames.filter((frame) => frame.getAttribute('aria-hidden') !== 'true').map((frame) => frame.dataset.demoFrame);
+    const track = section.querySelector('.demo-track');
+    const rect = track.getBoundingClientRect();
+    return JSON.stringify({
+      scrolly: section.classList.contains('is-scrolly'),
+      stagePosition: getComputedStyle(stage).position,
+      stageHidden: stage.hidden || getComputedStyle(stage).display === 'none',
+      active,
+      shown,
+      stageFrames: stageFrames.length,
+      progress: Number.parseFloat(section.style.getPropertyValue('--demo-progress') || '0'),
+      stepsWithFrame: steps.map((step) => !!step.querySelector('.preview-frame')),
+      motionEnterInLanding: document.querySelectorAll('#view-landing .motion-enter').length,
+      motionEnterInDemo: section.querySelectorAll('.motion-enter').length,
+      trackTop: rect.top + window.scrollY,
+      trackHeight: rect.height,
+      innerHeight: window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+      atBottom: window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2,
+    });
+  })()`;
+
+  const scrollListeners = async () => {
+    const win = await cdp.send('Runtime.evaluate', { expression: 'window', returnByValue: false });
+    const { listeners } = await cdp.send('DOMDebugger.getEventListeners', { objectId: win.result.objectId });
+    return listeners.filter((listener) => listener.type === 'scroll').map((listener) => ({ passive: listener.passive }));
+  };
+
+  const demoState = async () => JSON.parse(await evaluate(DEMO_PROBE));
+
+  /** The scroll demo in the pinned, reveal and static modes, at `${ORIGIN}/`. */
+  const runDemoChecks = async (tag, fileTag, width, reduce) => {
+    try {
+      await openFresh(`${ORIGIN}/`);
+      await poll('the demo frames', () => evaluate(`document.querySelectorAll('#demo .preview-frame').length === 5`), 8000, 50);
+      await sleep(200);
+      let state = await demoState();
+      const wide = width >= 640;
+      if (reduce) {
+        report(!state.scrolly && state.stageHidden && state.stageFrames === 0 ? 'PASS' : 'FAIL', `[${tag}] reduced motion: no is-scrolly, stage hidden, ${state.stageFrames} frames in the stage`);
+        report(state.stepsWithFrame.every(Boolean) && state.stepsWithFrame.length === 5 ? 'PASS' : 'FAIL', `[${tag}] five steps each hold their static preview frame`);
+        report(state.motionEnterInLanding === 0 ? 'PASS' : 'FAIL', `[${tag}] no motion-enter anywhere in the landing (${state.motionEnterInLanding})`);
+        await evaluate(SAMPLER_RESET);
+        const total = await evaluate('document.documentElement.scrollHeight');
+        for (let y = 0; y < total; y += state.innerHeight) {
+          await evaluate(`window.scrollTo(0, ${y})`);
+          await sleep(100);
+        }
+        const sampled = JSON.parse(await evaluate(SAMPLER_READ));
+        report(sampled.max === 0 && !sampled.ghost ? 'PASS' : 'FAIL', `[${tag}] scrolling the whole page runs no animation (max ${sampled.max}, names [${sampled.names.join(', ')}])`);
+        const listeners = await scrollListeners();
+        report(listeners.length === 0 ? 'PASS' : 'FAIL', `[${tag}] no window scroll listener under reduced motion (${listeners.length})`);
+        if (width === 360) {
+          await evaluate('window.scrollTo(0, 0)');
+          await sleep(100);
+          await screenshot('mobile-360-reduce.png', true);
+        }
+        return;
+      }
+
+      if (!wide) {
+        report(!state.scrolly && state.stageHidden ? 'PASS' : 'FAIL', `[${tag}] narrow motion: stacked, no is-scrolly, stage hidden`);
+        report(state.stepsWithFrame.every(Boolean) ? 'PASS' : 'FAIL', `[${tag}] five steps each contain their preview frame`);
+        for (const id of DEMO_IDS) {
+          await evaluate(`document.querySelector('[data-demo-step="${id}"] .preview-frame').scrollIntoView({ block: 'center' })`);
+          try {
+            await poll(`${id} frame to enter`, () => evaluate(`document.querySelector('[data-demo-step="${id}"] .preview-frame').classList.contains('motion-enter')`), 3000, 50);
+            report('PASS', `[${tag}] the "${id}" frame gets motion-enter when it scrolls into view`);
+          } catch (error) {
+            report('FAIL', `[${tag}] ${error.message}`);
+          }
+          if (id === 'suspects') {
+            await sleep(900);
+            await screenshot('mobile-360-motion.png', false);
+          }
+        }
+        try {
+          await poll('the entrances to settle', () => evaluate(SETTLED_NOW), 6000, 50);
+          report('PASS', `[${tag}] reveal animations settle`);
+        } catch (error) {
+          report('FAIL', `[${tag}] ${error.message}`);
+        }
+        return;
+      }
+
+      report(state.scrolly && state.stagePosition === 'sticky' && !state.stageHidden ? 'PASS' : 'FAIL', `[${tag}] scrolly mode with a sticky stage (is-scrolly ${state.scrolly}, position ${state.stagePosition})`);
+      let lastProgress = -1;
+      const wanted = {
+        onset: ['motion-draw-line'],
+        suspects: ['motion-rise', 'motion-diamond'],
+        evidence: ['motion-fill', 'motion-slide-in'],
+        postmortem: ['motion-rise'],
+      };
+      for (let k = 0; k < 5; k += 1) {
+        const id = DEMO_IDS[k];
+        state = await demoState();
+        const target = Math.round(state.trackTop + ((k + 0.5) / 5) * (state.trackHeight - state.innerHeight));
+        await evaluate(SAMPLER_RESET);
+        await evaluate(`window.scrollTo(0, ${target})`);
+        try {
+          await poll(`step ${id} to become active`, async () => (await demoState()).active[0] === id, 4000, 30);
+        } catch (error) {
+          report('FAIL', `[${tag}] ${error.message} (active ${JSON.stringify((await demoState()).active)})`);
+          continue;
+        }
+        await sleep(900);
+        state = await demoState();
+        const oneFrame = state.shown.length === 1 && state.shown[0] === id;
+        report(state.active.length === 1 && oneFrame ? 'PASS' : 'FAIL', `[${tag}] scroll position ${k} activates "${id}" and shows only its frame (active ${JSON.stringify(state.active)}, shown ${JSON.stringify(state.shown)})`);
+        report(state.progress > lastProgress ? 'PASS' : 'FAIL', `[${tag}] --demo-progress ${state.progress} rose from ${lastProgress}`);
+        lastProgress = state.progress;
+        if (wanted[id] !== undefined) {
+          const sampled = JSON.parse(await evaluate(SAMPLER_READ));
+          const missing = wanted[id].filter((name) => !sampled.names.includes(name));
+          report(missing.length === 0 ? 'PASS' : 'FAIL', `[${tag}] step "${id}" animations: ${sampled.names.join(', ')}${missing.length ? `; missing ${missing.join(', ')}` : ''}`);
+        }
+        try {
+          await poll(`step ${id} animations to settle`, () => evaluate(SETTLED_NOW), 3000, 50);
+          report('PASS', `[${tag}] step "${id}" animations settle`);
+        } catch (error) {
+          report('FAIL', `[${tag}] ${error.message}`);
+        }
+        if (k === 2) {
+          const listeners = await scrollListeners();
+          report(listeners.length === 1 && listeners[0].passive === true ? 'PASS' : 'FAIL', `[${tag}] while the demo is in view: ${listeners.length} scroll listener(s), passive ${JSON.stringify(listeners.map((entry) => entry.passive))}`);
+          await screenshot(`demo-mid-${fileTag}.png`, false);
+        }
+      }
+
+      // The page always scrolls freely past the demo, and leaving the landing removes the listener.
+      await evaluate(`window.scrollTo(0, document.documentElement.scrollHeight)`);
+      await sleep(500);
+      state = await demoState();
+      report(state.atBottom ? 'PASS' : 'FAIL', `[${tag}] the page scrolls to its very bottom past the demo`);
+      await evaluate(`window.scrollTo(0, 0)`);
+      await sleep(500);
+      let listeners = await scrollListeners();
+      report(listeners.length === 0 ? 'PASS' : 'FAIL', `[${tag}] no scroll listener while the demo is out of view at the top of the page (${listeners.length})`);
+      await evaluate(`window.scrollTo(0, ${Math.round(state.trackTop)})`);
+      await sleep(300);
+      listeners = await scrollListeners();
+      report(listeners.length === 1 ? 'PASS' : 'FAIL', `[${tag}] scrolling back to the demo restores exactly one scroll listener (${listeners.length})`);
+      await evaluate(`location.hash = '#/app'`);
+      await poll('the console view', async () => (await consoleState()).appVisible, 5000, 50);
+      await sleep(300);
+      listeners = await scrollListeners();
+      const scrolly = await evaluate(`document.querySelector('#demo').classList.contains('is-scrolly')`);
+      report(listeners.length === 0 && !scrolly ? 'PASS' : 'FAIL', `[${tag}] after leaving for #/app: ${listeners.length} scroll listeners, is-scrolly ${scrolly}`);
+    } catch (error) {
+      report('FAIL', `[${tag}] demo: ${error.message}`);
+    }
+  };
+
+  /** No horizontal scroll and a headline of at most two lines at every width from 320 to 1440. */
+  const runSweep = async () => {
+    const widths = [320, 360, 640, 768, 1024, 1280, 1440];
+    const plan = [
+      ...widths.map((width) => ({ width, mode: 'reduce' })),
+      { width: 1280, mode: 'no-preference' },
+      { width: 1440, mode: 'no-preference' },
+    ];
+    for (const { width, mode } of plan) {
+      const tag = `sweep ${width}x800 ${mode === 'reduce' ? 'reduce' : 'motion'}`;
+      try {
+        await cdp.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: width < 640 });
+        await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode }] });
+        await openFresh(`${ORIGIN}/`);
+        await poll('the previews', () => evaluate(`document.querySelectorAll('#features .preview-frame').length === 6 && document.querySelectorAll('#demo .preview-frame').length === 5`), 8000, 50);
+        const now = await landingState();
+        report(now.scrollWidth <= now.innerWidth ? 'PASS' : 'FAIL', `[${tag}] scrollWidth ${now.scrollWidth} vs innerWidth ${now.innerWidth}`);
+        report(now.h1Lines !== null && now.h1Lines <= 2 ? 'PASS' : 'FAIL', `[${tag}] h1 spans ${now.h1Lines} line(s)`);
+        const wide = await evaluate(`(() => {
+          let worst = null;
+          for (const node of document.querySelectorAll('#view-landing *')) {
+            const rect = node.getBoundingClientRect();
+            let clipped = false;
+            for (let parent = node.parentElement; parent !== null && parent.id !== 'view-landing'; parent = parent.parentElement) {
+              if (getComputedStyle(parent).overflowX !== 'visible' && parent.getBoundingClientRect().right <= window.innerWidth + 1) { clipped = true; break; }
+            }
+            if (!clipped && rect.width > 0 && rect.right > window.innerWidth + 1 && !node.closest('[aria-hidden="true"]') && !node.closest('.header-stripes') && !node.closest('.visually-hidden')) {
+              worst = node.tagName.toLowerCase() + '.' + String(node.className).split(' ')[0] + ' right=' + Math.round(rect.right);
+              break;
+            }
+          }
+          return worst;
+        })()`);
+        report(wide === null ? 'PASS' : 'FAIL', `[${tag}] no landing element extends past the viewport (${wide ?? 'none'})`);
+      } catch (error) {
+        report('FAIL', `[${tag}] ${error.message}`);
+      }
+    }
+  };
+
   const viewports = [
     { width: 1280, height: 720, mobile: false },
     { width: 360, height: 740, mobile: true },
@@ -898,6 +1100,7 @@ async function main() {
       await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: mode }] });
       await runLandingChecks(tag, fileTag, width, reduce);
       await runTabChecks(tag, fileTag, width, reduce);
+      await runDemoChecks(tag, fileTag, width, reduce);
       await openFresh(`${ORIGIN}/#/app`);
 
       const mediaOk = await evaluate(`matchMedia('(prefers-reduced-motion: ${reduce ? 'reduce' : 'no-preference'})').matches`);
@@ -1113,6 +1316,8 @@ async function main() {
       await runPaletteChecks(tag, fileTag, width, reduce);
     }
   }
+
+  await runSweep();
 
   report(consoleErrors.length === 0 ? 'PASS' : 'FAIL', `console errors: ${consoleErrors.length === 0 ? 'none' : consoleErrors.join(' || ')}`);
   report(offOrigin.length === 0 ? 'PASS' : 'FAIL', `off-origin requests: ${offOrigin.length === 0 ? 'none' : offOrigin.join(' || ')}`);
