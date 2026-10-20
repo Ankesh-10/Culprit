@@ -54,7 +54,7 @@ Open the console and pick one of three bundled incidents; one click analyzes it.
 | Slow burn | A gradual ramp |
 | Ambiguous | No clear culprit, reported honestly |
 
-To use your own data, choose "Use your own files" and supply a log and a history export (pick, drop or paste). The cap is 1 MiB of log text, 10,000 events and 100 stack lines per event. Every control works from the keyboard. Fonts are system stacks by default; see `FONTS.md` in `src/assets/fonts` to bundle Inter or Geist locally.
+To use your own data, choose "Use your own files" and supply a log and a history export (pick, drop or paste). The cap is 1 MiB of log text, 10,000 events and 100 stack lines per event. Every control works from the keyboard. Inside the suspect drawer, J moves to the next suspect and K to the previous one (the Previous and Next buttons do the same). The page follows the system light or dark setting and stores no preference. Fonts are system stacks by default; see `FONTS.md` in `src/assets/fonts` to bundle Inter or Geist locally.
 
 ## Input formats
 
