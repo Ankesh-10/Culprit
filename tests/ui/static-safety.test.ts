@@ -67,6 +67,18 @@ describe('static safety over src/ and index.html', () => {
     expect(offenders(srcFiles, frameApis)).toEqual(['src/ui/motion.ts']);
   });
 
+  it('adds scroll listeners only in src/ui/motion.ts and only as passive listeners', () => {
+    const scrollListener = /addEventListener\(\s*['"]scroll['"]/g;
+    expect(offenders(scanned, /addEventListener\(\s*['"]scroll['"]/)).toEqual(['src/ui/motion.ts']);
+    const motion = srcFiles.find((file) => file.path === 'src/ui/motion.ts');
+    const calls = [...(motion?.text.matchAll(scrollListener) ?? [])];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) {
+      const statement = (motion?.text ?? '').slice(call.index ?? 0).split(';')[0] ?? '';
+      expect(statement).toMatch(/passive:\s*true/);
+    }
+  });
+
   it('adds no runtime dependency and keeps exactly the four dev dependencies', () => {
     const packageJson = JSON.parse(readFileSync(join(rootPath, 'package.json'), 'utf8')) as {
       dependencies?: unknown;

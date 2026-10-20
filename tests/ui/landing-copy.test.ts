@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOG_LIMITS } from '../../src/core/log-parser';
 import { SCORING_V1 } from '../../src/core/scoring';
-import { FEATURE_TABS, limitsText, weightsText } from '../../src/ui/landing-model';
+import { DEMO_STEPS, FEATURE_TABS, limitsText, weightsText } from '../../src/ui/landing-model';
 
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
 const landing = /<div id="view-landing"[\s\S]*?<div id="view-app"/.exec(html)?.[0] ?? '';
@@ -25,6 +25,17 @@ describe('landing copy in index.html', () => {
       expect(landing).toContain(`data-preview="${tab.id}"`);
       expect(landing).toContain(`>${tab.label}</button>`);
     }
+  });
+
+  it('has a titled step and a preview slot for every demo step', () => {
+    expect(landing).toContain('>See it work</h2>');
+    for (const step of DEMO_STEPS) {
+      expect(landing).toContain(`data-demo-step="${step.id}"`);
+      expect(landing).toContain(`id="demo-heading-${step.id}"`);
+      expect(landing).toContain(`data-preview="demo-${step.id}"`);
+      expect(landing).toContain(`>${step.title}</h3>`);
+    }
+    DEMO_STEPS.forEach((_, index) => expect(landing).toContain(`Step ${index + 1} of ${DEMO_STEPS.length}`));
   });
 
   it('uses none of the banned marketing words or social-proof, signup and pricing language', () => {

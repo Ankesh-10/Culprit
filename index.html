@@ -112,6 +112,46 @@
             <div class="preview-slot" data-preview="offline"></div>
           </section>
         </section>
+        <section id="demo" class="landing-section demo" aria-labelledby="demo-title">
+          <h2 id="demo-title" class="section-title">See it work</h2>
+          <p class="demo-intro">The checkout outage case, step by step, rendered by the same code as the console.</p>
+          <div class="demo-progress" aria-hidden="true"><span class="demo-progress-fill"></span></div>
+          <div class="demo-layout">
+            <div class="demo-track">
+              <article class="demo-step" data-demo-step="inputs" aria-labelledby="demo-heading-inputs">
+                <p class="demo-step-count">Step 1 of 5</p>
+                <h3 id="demo-heading-inputs">Paste a log and the git history</h3>
+                <p>Culprit reads JSON-lines or plain-text logs and a Culprit JSON history export. Nothing is uploaded; the text stays in this page.</p>
+                <div class="preview-slot" data-preview="demo-inputs"></div>
+              </article>
+              <article class="demo-step" data-demo-step="onset" aria-labelledby="demo-heading-onset">
+                <p class="demo-step-count">Step 2 of 5</p>
+                <h3 id="demo-heading-onset">Find the onset</h3>
+                <p>Errors are counted per interval on a UTC axis, and the onset window marks where the rate breaks from its baseline. Here it is a sharp spike.</p>
+                <div class="preview-slot" data-preview="demo-onset"></div>
+              </article>
+              <article class="demo-step" data-demo-step="suspects" aria-labelledby="demo-heading-suspects">
+                <p class="demo-step-count">Step 3 of 5</p>
+                <h3 id="demo-heading-suspects">Rank the suspects</h3>
+                <p>Every commit made at or before the start of the onset window is scored on proximity, trace match, novelty and churn. The leading suspect carries the diamond; the score is ranked suspicion, not proof.</p>
+                <div class="preview-slot" data-preview="demo-suspects"></div>
+              </article>
+              <article class="demo-step" data-demo-step="evidence" aria-labelledby="demo-heading-evidence">
+                <p class="demo-step-count">Step 4 of 5</p>
+                <h3 id="demo-heading-evidence">Read the evidence</h3>
+                <p>The drawer breaks the score into its four contributions and lists the changed line ranges that overlap the failing stack frames.</p>
+                <div class="preview-slot" data-preview="demo-evidence"></div>
+              </article>
+              <article class="demo-step" data-demo-step="postmortem" aria-labelledby="demo-heading-postmortem">
+                <p class="demo-step-count">Step 5 of 5</p>
+                <h3 id="demo-heading-postmortem">Hand off a postmortem</h3>
+                <p>Copy the result as Markdown with the verdict, evidence, confidence and caveats, ready for the incident channel.</p>
+                <div class="preview-slot" data-preview="demo-postmortem"></div>
+              </article>
+            </div>
+            <div class="demo-stage" hidden></div>
+          </div>
+        </section>
         <section id="trust" class="landing-section" aria-labelledby="trust-title">
           <h2 id="trust-title" class="section-title">How it works</h2>
           <ul class="trust-list">

@@ -74,3 +74,48 @@ export function markdownExcerpt(text: string, maxLines: number): string[] {
   if (lines[lines.length - 1] === '') lines.pop();
   return lines.slice(0, Math.max(0, maxLines));
 }
+
+export const DEMO_STEPS = [
+  { id: 'inputs', title: 'Paste a log and the git history' },
+  { id: 'onset', title: 'Find the onset' },
+  { id: 'suspects', title: 'Rank the suspects' },
+  { id: 'evidence', title: 'Read the evidence' },
+  { id: 'postmortem', title: 'Hand off a postmortem' },
+] as const;
+
+export type DemoStepId = (typeof DEMO_STEPS)[number]['id'];
+
+/**
+ * How far through its pinned stretch the demo track is, from 0 to 1. `top` is the track's distance from the
+ * viewport top (negative once it has scrolled past), `height` its height and `viewport` the viewport height;
+ * the pinned stretch is the track height minus one viewport. Any non-finite input gives 0.
+ */
+export function scrollProgress(top: number, height: number, viewport: number): number {
+  if (![top, height, viewport].every(Number.isFinite)) return 0;
+  const distance = height - viewport;
+  if (distance <= 0) return top <= 0 ? 1 : 0;
+  return Math.min(1, Math.max(0, -top / distance));
+}
+
+export interface StepPosition {
+  index: number;
+  /** Progress inside the step, 0 to 1. */
+  local: number;
+}
+
+/** Splits 0..1 progress into `count` equal steps; progress 1 is the end of the last step. */
+export function stepAt(progress: number, count: number): StepPosition {
+  if (count <= 0 || !Number.isFinite(progress) || progress <= 0) return { index: 0, local: 0 };
+  const clamped = Math.min(1, progress);
+  const index = Math.min(count - 1, Math.floor(clamped * count));
+  const local = Math.min(1, Math.max(0, clamped * count - index));
+  return { index, local };
+}
+
+export type DemoMode = 'scrolly' | 'reveal' | 'static';
+
+/** Pinned stage only with motion allowed on a wide viewport; narrow gets once-on-enter reveals; reduced motion is static. */
+export function demoMode(options: { motion: boolean; wide: boolean }): DemoMode {
+  if (!options.motion) return 'static';
+  return options.wide ? 'scrolly' : 'reveal';
+}

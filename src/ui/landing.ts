@@ -1,6 +1,7 @@
 import { el } from './dom';
+import { mountDemo } from './landing-demo';
 import { FEATURE_TABS } from './landing-model';
-import { bundledStream, renderFeaturePreview, renderHeroCard } from './landing-preview';
+import { bundledStream, renderDemoPreview, renderFeaturePreview, renderHeroCard } from './landing-preview';
 import { mountFeatureTabs } from './landing-tabs';
 import { playEntrance } from './motion';
 import type { MotionScope } from './motion';
@@ -59,7 +60,9 @@ export function mountLanding(doc: Document, options: LandingOptions): LandingVie
     }
   }
 
+  const demo = mountDemo(required<HTMLElement>(doc, '#demo'), renderDemoPreview);
   let built = false;
+  let visible = false;
   let heroScope: MotionScope | null = null;
 
   function buildHero(): void {
@@ -76,14 +79,22 @@ export function mountLanding(doc: Document, options: LandingOptions): LandingVie
 
   return {
     show(): void {
-      if (built) return;
-      built = true;
-      buildHero();
-      buildFeatures();
+      visible = true;
+      if (!built) {
+        built = true;
+        buildHero();
+        buildFeatures();
+      }
+      // The demo builds its five frames on idle time, after the hero and the tabs; hiding the view stops it.
+      runWhenIdle(() => {
+        if (visible) demo.start();
+      });
     },
     hide(): void {
+      visible = false;
       heroScope?.dispose();
       heroScope = null;
+      demo.stop();
     },
   };
 }

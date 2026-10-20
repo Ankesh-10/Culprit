@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOG_LIMITS } from '../../src/core/log-parser';
 import { SCORING_V1 } from '../../src/core/scoring';
-import { FEATURE_TABS, limitsText, markdownExcerpt, prefixIdRefs, tabKeyTarget, weightsText } from '../../src/ui/landing-model';
+import {
+  DEMO_STEPS,
+  FEATURE_TABS,
+  demoMode,
+  limitsText,
+  markdownExcerpt,
+  prefixIdRefs,
+  scrollProgress,
+  stepAt,
+  tabKeyTarget,
+  weightsText,
+} from '../../src/ui/landing-model';
 
 describe('prefixIdRefs', () => {
   it('prefixes every token', () => {
@@ -95,5 +106,73 @@ describe('markdownExcerpt', () => {
   it('gives an empty list for empty text and handles CRLF', () => {
     expect(markdownExcerpt('', 14)).toEqual([]);
     expect(markdownExcerpt('a\r\nb\r\n', 14)).toEqual(['a', 'b']);
+  });
+});
+
+describe('DEMO_STEPS', () => {
+  it('lists the five steps in order', () => {
+    expect(DEMO_STEPS.map((step) => step.id)).toEqual(['inputs', 'onset', 'suspects', 'evidence', 'postmortem']);
+    for (const step of DEMO_STEPS) expect(step.title.length).toBeGreaterThan(0);
+  });
+});
+
+describe('scrollProgress', () => {
+  it('maps the section position to 0..1 over the pinned distance', () => {
+    expect(scrollProgress(0, 4000, 800)).toBe(0);
+    expect(scrollProgress(-1600, 4000, 800)).toBe(0.5);
+    expect(scrollProgress(-3200, 4000, 800)).toBe(1);
+  });
+
+  it('clamps before and after the section', () => {
+    expect(scrollProgress(500, 4000, 800)).toBe(0);
+    expect(scrollProgress(-9000, 4000, 800)).toBe(1);
+  });
+
+  it('handles a section that is not taller than the viewport', () => {
+    expect(scrollProgress(0, 600, 800)).toBe(1);
+    expect(scrollProgress(-10, 800, 800)).toBe(1);
+    expect(scrollProgress(10, 600, 800)).toBe(0);
+  });
+
+  it('gives 0 for any non-finite input', () => {
+    expect(scrollProgress(Number.NaN, 4000, 800)).toBe(0);
+    expect(scrollProgress(0, Number.POSITIVE_INFINITY, 800)).toBe(0);
+    expect(scrollProgress(0, 4000, Number.NaN)).toBe(0);
+  });
+});
+
+describe('stepAt', () => {
+  it('maps progress to a step index and the local progress inside it', () => {
+    expect(stepAt(0, 5)).toEqual({ index: 0, local: 0 });
+    expect(stepAt(0.19, 5).index).toBe(0);
+    expect(stepAt(0.2, 5)).toEqual({ index: 1, local: 0 });
+    expect(stepAt(0.5, 5)).toEqual({ index: 2, local: 0.5 });
+    expect(stepAt(0.999, 5).index).toBe(4);
+    expect(stepAt(1, 5)).toEqual({ index: 4, local: 1 });
+  });
+
+  it('treats negative and NaN progress as the first step and an empty list as index 0', () => {
+    expect(stepAt(-0.3, 5)).toEqual({ index: 0, local: 0 });
+    expect(stepAt(Number.NaN, 5)).toEqual({ index: 0, local: 0 });
+    expect(stepAt(0.5, 0)).toEqual({ index: 0, local: 0 });
+  });
+
+  it('keeps local progress within 0..1 everywhere', () => {
+    for (let step = -2; step <= 120; step += 1) {
+      const result = stepAt(step / 100, 5);
+      expect(result.local).toBeGreaterThanOrEqual(0);
+      expect(result.local).toBeLessThanOrEqual(1);
+      expect(result.index).toBeGreaterThanOrEqual(0);
+      expect(result.index).toBeLessThanOrEqual(4);
+    }
+  });
+});
+
+describe('demoMode', () => {
+  it('pins the stage only when motion is allowed and the viewport is wide', () => {
+    expect(demoMode({ motion: true, wide: true })).toBe('scrolly');
+    expect(demoMode({ motion: true, wide: false })).toBe('reveal');
+    expect(demoMode({ motion: false, wide: true })).toBe('static');
+    expect(demoMode({ motion: false, wide: false })).toBe('static');
   });
 });

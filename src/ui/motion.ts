@@ -172,3 +172,68 @@ export function playEntrance(sections: readonly HTMLElement[]): MotionScope {
     },
   };
 }
+
+/**
+ * Calls `onFrame(rect, viewportHeight)` at most once per animation frame while `target` is on screen. The one
+ * window scroll listener (passive) and the resize listener exist only while the target intersects the viewport;
+ * leaving it, `dispose()` and reduced motion all remove them and cancel the pending frame. It never prevents a
+ * default, never sets the scroll position and uses no timer, so it cannot hold the page back. A no-op scope
+ * when the user prefers reduced motion.
+ */
+export function watchScroll(target: HTMLElement, onFrame: (rect: DOMRect, viewportHeight: number) => void): MotionScope {
+  if (!prefersMotion()) return NOOP_SCOPE;
+
+  let listening = false;
+  let disposed = false;
+  let pending = 0;
+  let observer: IntersectionObserver | null = null;
+
+  const run = (): void => {
+    pending = 0;
+    if (disposed || !listening) return;
+    onFrame(target.getBoundingClientRect(), window.innerHeight);
+  };
+  const schedule = (): void => {
+    if (pending !== 0 || disposed) return;
+    pending = requestAnimationFrame(run);
+  };
+  const start = (): void => {
+    if (listening || disposed) return;
+    listening = true;
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+    schedule();
+  };
+  const stop = (): void => {
+    if (!listening) return;
+    listening = false;
+    window.removeEventListener('scroll', schedule);
+    window.removeEventListener('resize', schedule);
+    if (pending !== 0) {
+      cancelAnimationFrame(pending);
+      pending = 0;
+    }
+  };
+
+  if (typeof IntersectionObserver === 'function') {
+    observer = new IntersectionObserver((entries) => {
+      const latest = entries[entries.length - 1];
+      if (latest === undefined) return;
+      if (latest.isIntersecting) start();
+      else stop();
+    });
+    observer.observe(target);
+  } else {
+    start();
+  }
+
+  return {
+    dispose(): void {
+      if (disposed) return;
+      observer?.disconnect();
+      observer = null;
+      stop();
+      disposed = true;
+    },
+  };
+}

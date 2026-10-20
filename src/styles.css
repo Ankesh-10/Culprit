@@ -2781,6 +2781,104 @@ a.button-secondary {
   margin: 0;
 }
 
+/* Scroll demo: the base layout is the stacked sequence of steps (no script, reduced motion, phones).
+   The pinned stage is added only under the motion media query below. */
+
+.demo-intro {
+  max-width: 70ch;
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
+.demo-progress { display: none; }
+
+.demo-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-xl);
+}
+
+.demo-track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+  min-width: 0;
+}
+
+.demo-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-width: 0;
+}
+
+.demo-step h3 { margin: 0; }
+
+.demo-step > p {
+  max-width: 60ch;
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
+.demo-step > .demo-step-count {
+  color: var(--color-muted);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.demo-stage {
+  position: sticky;
+  min-width: 0;
+}
+
+.demo-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-ink-2);
+  transform: scaleX(var(--demo-progress, 0));
+  transform-origin: left center;
+}
+
+.inputs-preview {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.input-caption {
+  margin: 0 0 var(--space-xs);
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.input-list {
+  display: grid;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+  font-feature-settings: normal;
+  font-variant-ligatures: none;
+}
+
+.input-log-line {
+  max-height: calc(3 * 1.4em);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-2);
+}
+
+.input-commit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-md);
+}
+
+.input-commit-subject { font-family: var(--font-ui); color: var(--color-ink-2); }
+
 /* Motion (POLISH-02 early, quick 261020-ftp)
    One consolidated block. Everything that moves lives inside the no-preference media query, so the base
    state (no query, no script, reduced motion) is already the final state. Only transform, opacity and
@@ -2989,5 +3087,95 @@ a.button-secondary {
   /* Feature tabs: the panel that becomes visible rises in once (display none to block restarts it). */
   .feature-panel[role="tabpanel"]:not([hidden]) {
     animation: motion-rise 240ms var(--motion-ease-out) backwards;
+  }
+
+  /* Scroll demo (quick 261020-gzd). At 640px and wider with motion allowed, src/ui/landing-demo.ts adds
+     .is-scrolly: the five preview frames stack in a sticky stage and the active one fades in while its own
+     parts animate once. Only transform and opacity change; no ancestor of the stage sets overflow, which
+     would disable sticky. */
+  @keyframes motion-diamond {
+    40% { transform: scale(1.5); }
+  }
+
+  @keyframes motion-slide-in {
+    from { opacity: 0; transform: translateX(32px); }
+  }
+
+  @media (min-width: 640px) {
+    .demo.is-scrolly .demo-progress {
+      display: block;
+      height: 2px;
+      background: var(--color-grid);
+    }
+
+    .demo.is-scrolly .demo-layout {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: var(--space-2xl);
+      align-items: start;
+    }
+
+    .demo.is-scrolly .demo-track { gap: 0; }
+
+    .demo.is-scrolly .demo-step {
+      min-height: 80vh;
+      justify-content: center;
+      padding-left: var(--space-md);
+      border-left: 2px solid transparent;
+    }
+
+    .demo.is-scrolly .demo-step.is-active { border-left-color: var(--color-ink); }
+
+    .demo.is-scrolly .demo-step:not(.is-active) h3,
+    .demo.is-scrolly .demo-step:not(.is-active) > p { color: var(--color-muted); }
+
+    .demo.is-scrolly .demo-step.is-active h3 { color: var(--color-ink); }
+
+    .demo.is-scrolly .demo-stage {
+      top: calc((100vh - min(560px, 76vh)) / 2);
+      height: min(560px, 76vh);
+    }
+
+    .demo-stage > .preview-frame {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity var(--motion-enter) var(--motion-ease-out), transform var(--motion-enter) var(--motion-ease-out);
+      pointer-events: none;
+    }
+
+    .demo-stage > .preview-frame.is-active {
+      opacity: 1;
+      transform: none;
+    }
+
+    .preview-frame.is-active .input-list li {
+      animation: motion-rise 500ms var(--motion-ease-out) backwards;
+      animation-delay: calc(var(--row-index, 0) * 70ms);
+    }
+
+    .preview-frame.is-active .lineup-card {
+      animation: motion-rise 500ms var(--motion-ease-out) backwards;
+      animation-delay: calc(var(--card-index, 0) * 100ms);
+    }
+
+    .preview-frame.is-active .lineup-card.is-leading .rank-diamond {
+      animation: motion-diamond 700ms var(--motion-ease-out) 400ms backwards;
+    }
+
+    .preview-frame.is-active .drawer-preview {
+      animation: motion-slide-in 420ms var(--motion-ease-out) backwards;
+    }
+
+    .preview-frame.is-active .contribution-fill {
+      transform-origin: left center;
+      animation: motion-fill 600ms var(--motion-ease-out) backwards;
+      animation-delay: calc(var(--signal-index, 0) * 100ms + 250ms);
+    }
+
+    .preview-frame.is-active .md-line {
+      animation: motion-rise 400ms var(--motion-ease-out) backwards;
+      animation-delay: calc(var(--line-index, 0) * 60ms);
+    }
   }
 }

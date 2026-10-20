@@ -5,10 +5,10 @@ import { buildPostmortemMarkdown } from './copy';
 import { el, svgEl } from './dom';
 import { renderDrawerContent } from './drawer';
 import { buildDrawerView } from './drawer-model';
-import { formatInteger, formatUtcInterval } from './format';
+import { formatInteger, formatUtcClock, formatUtcInterval } from './format';
 import { initialInvestigation } from './investigation-model';
-import { FEATURE_TABS, markdownExcerpt, prefixIdRefs, weightsText } from './landing-model';
-import type { FeatureTabId } from './landing-model';
+import { DEMO_STEPS, FEATURE_TABS, markdownExcerpt, prefixIdRefs, weightsText } from './landing-model';
+import type { DemoStepId, FeatureTabId } from './landing-model';
 import { renderShortlist } from './shortlist';
 import { sparklinePath } from './sparkline';
 import { renderTimeline } from './timeline';
@@ -88,7 +88,7 @@ export function prepareRendered<T extends Element>(root: T, prefix: string): T {
     for (const name of ID_REFERENCE_ATTRIBUTES) {
       const value = node.getAttribute(name);
       if (value === null) continue;
-      const tokens = value.split(/s+/).filter((token) => token !== '');
+      const tokens = value.split(/\s+/).filter((token) => token !== '');
       node.setAttribute(name, tokens.map((token) => (token.startsWith(own) ? token : prefixIdRefs(token, prefix))).join(' '));
     }
     for (const name of FOCUS_HOOK_ATTRIBUTES) node.removeAttribute(name);
@@ -354,6 +354,100 @@ export function renderFeaturePreview(id: FeatureTabId, prefix: string): HTMLElem
       summary: part.summary,
       body: part.node,
       inertBody: inert,
+    });
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// Demo previews: one frame per scroll-demo step, each from the same renderers and the checkout fixture.
+// ---------------------------------------------------------------------------------------------------------
+
+const RAW_LOG_LINES_SHOWN = 3;
+
+function nonEmptyLines(text: string): string[] {
+  return text.split(/\r?\n/).filter((line) => line.trim() !== '');
+}
+
+/** Step one: the first raw log lines and the commit list, as they arrive. */
+function inputsPart(stream: AnalysisStream): PreviewPart | null {
+  const bundledCase = findCase(CHECKOUT);
+  if (bundledCase === undefined) return null;
+  const logLines = nonEmptyLines(bundledCase.logsText);
+  const shown = logLines.slice(0, RAW_LOG_LINES_SHOWN);
+  const logRows = shown.map((line, index) => {
+    const row = el('li', { className: 'input-log-line', text: line });
+    row.style.setProperty('--row-index', String(index));
+    return row;
+  });
+  const commitRows = stream.commits.map((commit, index) => {
+    const row = el('li', { className: 'input-commit' }, [
+      el('span', { className: 'input-commit-sha', text: commit.sha.slice(0, 7) }),
+      el('span', { className: 'input-commit-time', text: formatUtcClock(commit.timestampUtc) }),
+      el('span', { className: 'input-commit-subject', text: commit.subject }),
+    ]);
+    row.style.setProperty('--row-index', String(RAW_LOG_LINES_SHOWN + index));
+    return row;
+  });
+  const logCaption = `logs.jsonl · ${formatInteger(logLines.length)} lines`;
+  const historyCaption = `history.json · ${formatInteger(stream.commits.length)} commits`;
+  const node = el('div', { className: 'inputs-preview' }, [
+    el('div', { className: 'input-group' }, [
+      el('p', { className: 'input-caption', text: logCaption }),
+      el('ul', { className: 'input-list input-logs' }, logRows),
+    ]),
+    el('div', { className: 'input-group' }, [
+      el('p', { className: 'input-caption', text: historyCaption }),
+      el('ul', { className: 'input-list input-commits' }, commitRows),
+    ]),
+  ]);
+  return { node, summary: `Inputs: ${logCaption} and ${historyCaption}.` };
+}
+
+function indexed(nodes: Iterable<Element>, property: string): void {
+  let index = 0;
+  for (const node of nodes) {
+    (node as HTMLElement).style.setProperty(property, String(index));
+    index += 1;
+  }
+}
+
+/** The preview frame for one demo step, or null when its data is unavailable. */
+export function renderDemoPreview(stepId: DemoStepId): HTMLElement | null {
+  try {
+    const stream = bundledStream(CHECKOUT);
+    if (stream === null) return null;
+    const own = `demo-${stepId}`;
+    let part: PreviewPart | null;
+    switch (stepId) {
+      case 'inputs':
+        part = inputsPart(stream);
+        break;
+      case 'onset':
+        part = timelinePart(stream, own);
+        break;
+      case 'suspects':
+        part = lineupPart(stream, own);
+        if (part !== null) indexed(part.node.querySelectorAll('.lineup-card'), '--card-index');
+        break;
+      case 'evidence':
+        part = drawerPart(stream, own);
+        if (part !== null) indexed(part.node.querySelectorAll('.signal-row'), '--signal-index');
+        break;
+      default:
+        part = markdownPart(stream);
+        break;
+    }
+    if (part === null) return null;
+    const position = DEMO_STEPS.findIndex((step) => step.id === stepId);
+    const title = DEMO_STEPS[position]?.title ?? stepId;
+    return previewFrame({
+      label: `Preview: step ${position + 1}, ${title}`,
+      caption: 'Live preview · Checkout outage',
+      summary: part.summary,
+      body: part.node,
+      inertBody: true,
     });
   } catch {
     return null;
