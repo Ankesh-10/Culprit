@@ -268,6 +268,9 @@ kbd {
 @media print {
   .ambient,
   .header-stripes { display: none; }
+
+  .command-palette { border: 1px solid CanvasText; }
+  .palette-option.is-active { border-left-color: Highlight; }
 }
 
 @media (min-width: 1024px) {
@@ -2224,6 +2227,110 @@ kbd {
   .header-stripes { display: none; }
 }
 
+/* Command palette: a native modal dialog with a combobox and a listbox. The active row carries a 4px ink rule
+   as well as aria-selected, so selection is never colour alone. */
+
+.panel-heading-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.panel-heading-row h2 { margin: 0; }
+
+.palette-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.command-palette {
+  width: min(560px, calc(100vw - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 15vh - var(--space-md));
+  margin: 15vh auto auto;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-raised);
+  color: var(--color-ink);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.command-palette::backdrop { background: rgba(0, 0, 0, 0.72); }
+
+.palette-body { padding: var(--space-md); }
+
+.palette-body h2 { margin: 0 0 var(--space-sm); }
+
+.palette-input {
+  display: block;
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--color-control-border);
+  border-radius: var(--radius-control);
+  background: var(--color-elevated);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+.palette-input::placeholder { color: var(--color-muted); }
+
+.palette-list {
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.palette-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: var(--hit-min);
+  padding: var(--space-sm) var(--space-md) var(--space-sm) calc(var(--space-md) - 4px);
+  border-left: 4px solid transparent;
+  border-radius: var(--radius-row);
+  cursor: pointer;
+}
+
+.palette-option:hover { background: var(--color-elevated); }
+
+.palette-option.is-active {
+  border-left-color: var(--color-ink);
+  background: var(--color-elevated);
+}
+
+.palette-label { font-weight: var(--weight-medium); }
+
+.palette-hint {
+  color: var(--color-ink-2);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.palette-count {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-muted);
+  font-size: var(--text-label);
+  line-height: var(--leading-label);
+}
+
+.palette-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.palette-footer .key-hint { margin: 0; }
+
 /* Motion (POLISH-02 early, quick 261020-ftp)
    One consolidated block. Everything that moves lives inside the no-preference media query, so the base
    state (no query, no script, reduced motion) is already the final state. Only transform, opacity and
@@ -2407,4 +2514,17 @@ kbd {
   .header-stripes span:nth-child(3) { animation-delay: 180ms; }
 
   .ambient { animation: motion-drift 48s linear infinite; }
+
+  /* Command palette: a short rise on open over the same backdrop fade as the drawer. */
+  @keyframes motion-palette-in {
+    from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  }
+
+  .command-palette[open] {
+    animation: motion-palette-in 160ms var(--motion-ease-out) backwards;
+  }
+
+  .command-palette[open]::backdrop {
+    animation: motion-fade 200ms ease-out backwards;
+  }
 }

@@ -40,8 +40,8 @@ Direction: a quiet **case file**, not a generic dark dashboard. The idea comes f
 - **One motif, used consistently.** The 16px diamond (the timeline's commit mark) is also the wordmark glyph in the header (filled, ink), the rank marker on shortlist cards (`#1` filled aqua `#199e70`, `#2`/`#3` filled gray `#8fa0b8`, matching the chart exactly), and the check glyph on the loaded case card (ink). No other decorative shape exists.
 - **The shortlist is a lineup.** Section heading "Suspect lineup" (sentence case, Body 500). Cards sit side by side at 1024px and up with equal height and the rank diamond leading each card. Copy remains evidence-first; the word "suspect" never implies guilt (see Copywriting voice rules).
 - **Case cards show real data, not icons.** Each case card carries a 28px-high error-rate sparkline of that fixture's buckets (2px line `#3987e5`, no axes, no fill), computed by running the pure `analyze()` core once per bundled case on idle after first paint (deterministic, local, no network). If it fails or is slow, the card renders without the sparkline; the sparkline is `aria-hidden` and its meaning is already in the chip text ("Sharp spike", "Slow ramp", "Ambiguous").
-- **No ornaments.** A four-step surface ladder carries elevation: page `#07080a`, surface `#0d0d0d`, elevated `#101111`, raised `#121212`. Every card is edged by a 1px `#242728` hairline. There are no shadows, gradients, glass, emoji, eyebrow labels, uppercase tracked captions, icon-topped cards, or index numbering other than real rank. Chrome is monochrome: white marks the one primary action, ink marks selection, and `#57c1ff` marks keyboard focus only. Status accents appear only in icons, status stripes and soft badges; data-viz colours appear only in chart marks. The remaining lines carry function: control and drop-zone borders (non-text contrast; the drop zone is 2px dashed), table row rules, and chart baseline/gridlines (a measured instrument). The leading-suspect aqua (`#199e70`) never shares an element with a focus ring.
-- **Not in scope here.** Scroll-driven motion, GSAP and stock imagery do not apply: Culprit is an offline analysis tool with no network assets, and motion is gated to Phase 5 (POLISH-02).
+- **No ornaments.** A four-step surface ladder carries elevation: page `#07080a`, surface `#0d0d0d`, elevated `#101111`, raised `#121212`. Every card is edged by a 1px `#242728` hairline. There are no shadows, gradients, glass, emoji, eyebrow labels, uppercase tracked captions, icon-topped cards, or index numbering other than real rank. Chrome is monochrome: white marks the one primary action, ink marks selection, and `#57c1ff` marks keyboard focus only. Status accents appear only in icons, status stripes and soft badges; data-viz colours appear only in chart marks. The remaining lines carry function: control and drop-zone borders (non-text contrast; the drop zone is 2px dashed), table row rules, and chart baseline/gridlines (a measured instrument). The leading-suspect aqua (`#199e70`) never shares an element with a focus ring. The one signature moment is the flat three-stripe red band behind the header text, plus a barely visible dot grid behind the page (see "Decorative layers" under Color); both are flat fills, aria-hidden, and never carry meaning.
+- **Motion is purposeful and gated.** Scroll-driven motion, GSAP and stock imagery still do not apply: Culprit is an offline analysis tool with no network assets. Purposeful, reduced-motion-aware motion (a staggered entrance, a verdict reveal, a timeline draw-in, a drawer slide) is specified in the Motion Contract below; it implements part of POLISH-02 early, at the user's request.
 
 ### Recommended module boundaries (non-binding; planner may adjust)
 
@@ -180,6 +180,17 @@ Status colors (fixed, never themed, reserved; always shipped with icon plus visi
 
 Neutral informational states (no-incident, insufficient data, loading) use ink-2 icon plus label; they are not errors and must not wear status colors. Status colors are never used as series colors, and series colors are never used as status.
 
+**Decorative layers (stripe band and ambient dot grid).** Flat fills only: no gradient, shadow, blur or glass. Both layers are `aria-hidden`, `pointer-events: none`, hidden in print and in forced colours, and carry no meaning. Red here is decoration, never status.
+
+| Token | Value | Opacity token | Opacity | Muted text (`#9c9c9d`) over it on the page |
+|-------|-------|---------------|---------|--------------------------------------------|
+| `--stripe-1` | `#ff5757` | `--stripe-1-opacity` | 0.24 | 5.42:1 |
+| `--stripe-2` | `#e04848` | `--stripe-2-opacity` | 0.32 | 5.13:1 |
+| `--stripe-3` | `#a1131a` | `--stripe-3-opacity` | 0.5 | 5.29:1 |
+| ambient dot | ink `#f4f4f6` | `--ambient-opacity` | 0.04 | 6.89:1 (muted over the dot itself) |
+
+The header band is three skewed (`skewX(-24deg)`) 28px stripes, 48px apart so they never overlap, anchored to the right of the header and clipped to its height behind the text. Each stripe opacity is capped at 0.5 and the ambient layer at 0.04. `tests/ui/contrast.test.ts` requires ink, ink-2 and muted at 4.5:1 or better over every stripe, over every stripe on top of an ambient dot (worst case: muted over stripe-2 on a dot, 4.69:1) and over the dot alone (ink 17.2, ink-2 11.88, muted 6.89). The ambient layer is a fixed 24px SVG dot pattern (1px radius dots) that drifts one pattern period over 48 seconds.
+
 ---
 
 ## Data Visualization Contract
@@ -240,7 +251,7 @@ Tooltips enhance and never gate: every tooltip value is also in the always-visib
 - Color is never the only signal: onset = bracket + label + table flag; leading suspect = size + label + legend + list rank; filtered series = legend text "Filtered: {signature}".
 - Texture (opt-in): under `@media (forced-colors: active)` and `@media print`, the onset band switches to a 45-degree hatch (`<pattern>`), strokes use `CanvasText` / `Highlight`, markers keep their shapes. Never on by default.
 - Text contrast for ink, ink-2 and muted is 7.09:1 or higher on the chart surface. Series, onset, suspect and context marks are 5.00:1 or higher on `#0d0d0d` (3:1 required).
-- `prefers-reduced-motion`: Phase 4 has no transitions on the chart, drawer or cards. The loading indicator is a static icon with text; it only rotates under `prefers-reduced-motion: no-preference`.
+- `prefers-reduced-motion`: every animation lives inside `@media (prefers-reduced-motion: no-preference)`; under `reduce` the chart, drawer, cards, meters and verdict values are at their final state instantly (see the Motion Contract). The loading indicator is a static icon with text; it only rotates under `no-preference`.
 
 ### Palette Validation Record (dataviz step 3, runnable validator)
 
@@ -281,6 +292,8 @@ Grid: regions 5-10 are full-width cards stacked with `lg` (24px) gaps. Shortlist
 ### Input panel
 
 - Three **case cards** (`<button>`, 44px minimum, on the elevated surface with the control-border edge and a 10px radius, equal width at 640px and up, stacked on phone): case name (Heading 24px is too large — use Body 16px / 500), the 28px error-rate sparkline (see Identity and idea), manifest purpose (Label 14px ink-2, up to 3 lines), a chip with the demonstrated pattern ("Sharp spike", "Slow ramp", "Ambiguous" from `manifest.expected.onsetClass`). One click loads and analyzes: UX-01. The loaded case shows a 4px ink left rule and a check icon, with `aria-pressed="true"`.
+- **Palette trigger row.** The panel heading "Load an incident" shares a wrapping row with a secondary button "Press `/` to jump to a case" (`id="palette-trigger"`, `aria-haspopup="dialog"`, `aria-keyshortcuts="/ Control+K Meta+K"`, `kbd` keycap inside; accessible name "Press / to jump to a case"). It opens the command palette; every other control stays reachable without it.
+- Case cards brighten their border to ink-2 on hover and on keyboard focus (the control-border is already 3.6:1, so the brighter step is ink-2 rather than the dimmer hairline-strong) and sweep their sparkline in from the left (motion runs only).
 - **Own files** form (collapsed behind "Use your own files" before first result; expanded by default only when the user opens it):
   - Two fields, "Log" and "Git history". Each is a drop zone (`<label>` wrapping a visually hidden but focusable `<input type="file">`; accept `.jsonl,.log,.txt` and `.json`) with 2px dashed control-border, icon, text "Drop a file or choose one", and helper text "JSON-lines or plain text · up to 1 MiB · 10,000 events" / "Culprit JSON history export". During drag-over the border becomes solid 2px ink (`#f4f4f6`) and the text changes to "Release to load" (text change, not color alone).
   - Under each zone a disclosure "Or paste text" containing a `<textarea>` (mono, 16px, 8 rows laptop, 6 rows phone, `spellcheck="false"`, `autocomplete="off"`).
@@ -308,7 +321,7 @@ Headed "Suspect lineup" (`h2`, Body 500). `<ol>` of up to three suspect cards: r
 
 ### Timeline card (UX-03, UX-04)
 
-Header row: heading "Timeline" (Body 500), chart title "Errors per 5-minute interval (UTC)", filter chip (when a signature is active: `Filtered: {signature}` plus "Clear filter" button), buttons "Jump to onset" and "Jump to peak". Then the legend row, the SVG, the **key hint**, the readout bar, and the table twin `<details>`. The key hint sits between the chart and the readout bar: "Keys: ← → move between intervals, Enter opens log lines", the keys drawn as flat `#121212` `kbd` keycaps (mono, 1px hairline, 4px radius). It documents keys the slider already handles and adds no shortcut.
+Header row: heading "Timeline" (Body 500), chart title "Errors per 5-minute interval (UTC)", filter chip (when a signature is active: `Filtered: {signature}` plus "Clear filter" button), buttons "Jump to onset" and "Jump to peak". Then the legend row, the SVG, the **key hint**, the readout bar, and the table twin `<details>`. The key hint sits between the chart and the readout bar: "Keys: ← → move between intervals, Enter opens log lines", the keys drawn as flat `#121212` `kbd` keycaps (mono, 1px hairline, 4px radius). It documents keys the slider already handles and adds no shortcut. On a new result the line draws in, the onset band wipes in from its left edge, the commit diamonds pop in staggered and the #1 marker pulses once; stepping or resizing never replays this, a filter change only crossfades the series (200ms) and the readout text fades in over 150ms whenever it changes.
 
 - Domain: from `min(first bucket start, earliest eligible commit)` to `max(last bucket end, latest eligible commit)`. If the extended domain would exceed 6 times the log span, clip it to `[first bucket start − log span, last bucket end]` and show the note "N earlier commits are outside this view; see Commits considered." The error line only spans the bucket range; the onset band and commit lane share the same scale.
 - Bucket width label comes from the data (`bucketEndUtc − bucketStartUtc`), not hard-coded "5".
@@ -325,7 +338,7 @@ Columns: Signature (mono, wraps), Events (right-aligned, tabular), First seen (U
 
 ### Suspect drawer (UX-05)
 
-A native `<dialog>` opened with `showModal()` (focus trap, Escape to close, background inert, backdrop `rgba(0,0,0,0.72)` (neutral, no blur)). Laptop: anchored right, 480px wide, full height, scrolls internally. Below 640px: full viewport (100vw by 100dvh). No slide animation in Phase 4.
+A native `<dialog>` opened with `showModal()` (focus trap, Escape to close, background inert, backdrop `rgba(0,0,0,0.72)` (neutral, no blur)). Laptop: anchored right, 480px wide, full height, scrolls internally. Below 640px: full viewport (100vw by 100dvh). Opening slides the drawer in from the right over a fading backdrop (320ms; from below on phones, with a short fade). Closing is instant: the native close is synchronous, so focus returns to the opener without delay. Reduced motion shows it with no animation.
 
 - Focus: on open, focus moves to the drawer title (`tabindex="-1"`); on close, focus returns to the control that opened it (stored reference; re-resolved by suspect rank if the DOM was re-rendered).
 - Header: title `#1 3a4b5c6`, subtitle commit subject, buttons "Previous suspect" / "Next suspect" (disabled at the ends, with text labels at 640px and up and icon-only with `aria-label` below), and "Close suspect drawer" (44px; icon-only below 640px with the same `aria-label`).
@@ -351,6 +364,41 @@ A native `<dialog>` opened with `showModal()` (focus trap, Escape to close, back
 
 ---
 
+## Motion Contract
+
+Added by quick task 261020-ftp. It implements part of POLISH-02 early (global shortcuts plus purposeful, reduced-motion-aware transitions) at the user's request; the suspect-stepping shortcuts are not shipped and POLISH-02 stays open.
+
+**Tokens** (CSS custom properties on `:root`; the script-side twins in `src/ui/motion-model.ts` are pinned to them by a test):
+
+| Token | Value | Use |
+|-------|-------|-----|
+| `--motion-ease-out` | `cubic-bezier(0.16, 1, 0.3, 1)` | Every entrance |
+| `--motion-enter` | 600ms | Fade and 12px rise of each result section |
+| `--motion-stagger` | 80ms per index, capped at index 7 | `--index` delay between sections |
+| `--motion-fast` | 150ms | Readout text fade |
+| `--motion-draw` | 900ms | Timeline line draw-in |
+| `--motion-drawer` | 320ms | Drawer slide |
+| decode | 450ms | Verdict hash decode (script) |
+| count-up | 600ms | Score and "Matches N of M errors" count-up (script) |
+
+**Entrance choreography.** On a new result the status banner and every result section (verdict, lineup, considered, timeline, log panel, signatures, trust footer) fade and rise 12px over 600ms, staggered 80ms by index. Sections already on screen play at once; sections below the fold play when they first scroll into view (an `IntersectionObserver`, guarded by a `typeof` check). It plays once per result: the stale re-render during a later load never replays it.
+
+**Verdict reveal.** The 7-character hash decodes left to right in about 450ms and ends on the exact hash; the score and the matching-error count count up in about 600ms. The score meter and the confidence segments fill with `transform: scaleX`. The decode and count-up run on an `aria-hidden` overlay span; the real text node is never modified, so assistive technology and tests read the exact value from the first paint, and a finished, cancelled or skipped roll always leaves the exact final text (the overlay is removed). A wrong value is never left visible.
+
+**Timeline.** The primary series line draws in (`stroke-dashoffset`), the onset band wipes in from its left edge (`scaleX`), commit diamonds pop in staggered (`scale`, 40ms apart) and the #1 marker emits one pulse ring (plays once, never loops). The draw-in is a class held on the timeline section only while its animations run, so re-selecting an interval, stepping the slider and resizing never replay it. A signature filter crossfades the series (200ms), and the readout text fades in over 150ms on every change.
+
+**Cards, loading and drawer.** Card sparklines sweep in on hover and keyboard focus (the sparkline uses a non-scaling stroke, which makes a dash-offset draw unreliable, so it wipes from the left with `scaleX`). The first-load placeholder gets a thin flat scanline (three sweeps, then still). The drawer slides in over a fading backdrop; closing is instant.
+
+**Command palette.** A native modal `<dialog id="command-palette">` with a search field (`role="combobox"`, `aria-controls`, `aria-activedescendant`), a `role="listbox"` of the three cases plus "Use your own files", a polite result count ("4 results", "1 result", "No matching cases") and a key hint. The active option has `aria-selected` plus a 4px ink left rule, so selection is never colour alone. Opening plays a 160ms rise over the same backdrop fade as the drawer.
+
+**Reduced-motion contract.** Every keyframe, animation and transition lives inside `@media (prefers-reduced-motion: no-preference)`, and the base state (no media query, no script, reduced motion) is already the final state: no running animation, no overlay, exact text, full meters, fully drawn line. Script only starts motion when `prefers-reduced-motion: no-preference` matches, and a script failure never hides content. `tests/ui/contrast.test.ts` enforces this with `motionViolations(css)`: ungated motion, keyframes animating anything but `transform`, `opacity` and `stroke-dashoffset`, `transition: all`, `forwards` or `both` fills, and infinite loops other than the two below all fail. Gradients, glass (`backdrop-filter`) and non-inset shadows still fail their own tests.
+
+**Loops and cancellation.** The only loops are the loading spinner (`culprit-spin`) and the ambient dot-grid drift (`motion-drift`, 48s, linear, one 24px pattern period); the pulse ring and scanline play a finite number of times. Fills are `backwards` only, so finished animations release their elements. No timer or animation blocks input or moves focus; the render pass disposes the previous `MotionScope` (pending frames, observer, listeners) before it rebuilds the body, so latest-request-wins is intact.
+
+**Boundaries.** Animation-frame APIs are allowed only in `src/ui/motion.ts` (a narrow allow-list in `tests/ui/static-safety.test.ts`); `src/core` is untouched, and nothing here reads the clock for analysis output.
+
+---
+
 ## Interaction and State Contract
 
 ### Page state machine
@@ -369,7 +417,7 @@ Transitions: choosing a case or pressing "Analyze incident" enters `loading` imm
 | State | Trigger | Banner icon and label | Region content | Focus / announcement |
 |-------|---------|----------------------|----------------|----------------------|
 | Empty (idle) | First load | info icon, "Ready — no incident loaded" | Input panel with case cards; result region shows the empty-state block | none; skip link targets the heading |
-| Loading | Case click or Analyze | loader icon, "Analyzing locally..." | Previous result dimmed to 60% and `aria-busy`; on first load, a 120px placeholder row inside the result region with the text only | live: "Analyzing incident." |
+| Loading | Case click or Analyze | loader icon, "Analyzing locally..." | Previous result dimmed to 60% and `aria-busy`; on first load, a 120px placeholder row inside the result region with the text only (a thin 2px scanline sweeps across it three times under motion; no skeleton shapes) | live: "Analyzing incident." |
 | Validation error | `ok: false` | x-circle (critical stripe), "We couldn't analyze these inputs" | Error summary with one entry per diagnostic, mapped action (see Copywriting), focusable "Fix input" link to the offending field; inputs stay filled | focus to the error heading; `role="alert"` |
 | No incident | `onset.class === 'none'` | info, "No incident detected" | Banner, onset explanation, timeline (flat), signatures table; verdict and shortlist replaced by the explanation panel; Markdown copy still available | focus to the result heading |
 | Insufficient data | `onset.class === 'insufficient-data'` | info, "Not enough data to find an onset" | Same layout as no incident with the data-length guidance | same |
@@ -391,7 +439,9 @@ Onset class `ambiguous` always lands in Low confidence copy. The slow-burn ramp 
 | Commit markers | Tab to reach, Enter/Space opens the drawer |
 | Tables | Tab to the scroll region, arrow keys scroll; per-row buttons are normal tab stops |
 | Drawer | Focus trapped by `<dialog>`; Escape or Close returns focus to the opener |
-| Keyboard shortcuts for suspect stepping | **Not in Phase 4** (POLISH-02, gated). "Previous suspect" / "Next suspect" are ordinary buttons. |
+| Global shortcuts | `/` outside a text field, input, select or contenteditable, and Ctrl/Cmd+K anywhere, open the command palette (ignored while a modal dialog is open). A visible button "Press / to jump to a case" does the same. |
+| Command palette | Type to filter the cases and "Use your own files" by name; ArrowUp/ArrowDown move the active option and wrap; Enter loads the active entry; Esc (or Close, or a backdrop click) closes it and focus returns to the opener. The result count is announced politely. |
+| Keyboard shortcuts for suspect stepping | **Not shipped** (rest of POLISH-02, still open). "Previous suspect" / "Next suspect" are ordinary buttons. |
 
 ### Focus and visibility
 

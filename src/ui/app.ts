@@ -14,6 +14,8 @@ import type { DrawerHandlers } from './drawer';
 import { buildDrawerView } from './drawer-model';
 import { registerLocalFonts } from './fonts';
 import { playEntrance, resultSections } from './motion';
+import { paletteEntries } from './palette-model';
+import { mountCommandPalette } from './palette';
 import type { MotionScope } from './motion';
 import { initialCopyFeedback, initialPageState, reduceCopyFeedback, reducePage, scheduleLoadingBanner } from './state';
 import type { CopyEvent, CopyFeedback, PageEvent, PageState, Scheduler, SettledState } from './state';
@@ -428,4 +430,5 @@ export function mountApp(doc: Document): void {
   renderPicker();
   render({ phase: 'idle' });
   computeSparklines();
+  mountCommandPalette(doc, { entries: paletteEntries(BUNDLED_CASES), onLoad: loadById, onOwnFiles: () => fixInput('log') });
 }

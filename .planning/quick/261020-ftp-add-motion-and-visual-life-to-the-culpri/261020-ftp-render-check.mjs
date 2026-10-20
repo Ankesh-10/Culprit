@@ -418,6 +418,125 @@ async function main() {
     console.log(`SHOT  ${file}`);
   };
 
+  /** Types one character the way a keyboard does (keydown with text, then keyup). */
+  const pressText = async (text, code, keyCode, modifiers = 0) => {
+    const base = { key: text, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, modifiers };
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...base, text });
+    await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...base });
+  };
+
+  const PALETTE_STATE = `(() => {
+    const dialog = document.querySelector('#command-palette');
+    const active = document.activeElement;
+    return JSON.stringify({
+      open: dialog.open,
+      focusId: active ? active.id : null,
+      focusClass: active ? String(active.className) : null,
+      focusTag: active ? active.tagName : null,
+      options: [...document.querySelectorAll('#palette-list [role="option"]')].map((option) => option.textContent),
+      count: (document.querySelector('.palette-count') || {}).textContent || null,
+      activeDescendant: (document.querySelector('#palette-input') || { getAttribute: () => null }).getAttribute('aria-activedescendant'),
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    });
+  })()`;
+
+  /** The command palette: shortcuts, filtering, keyboard model, focus return and the editable-field exemption. */
+  const runPaletteChecks = async (tag, fileTag, width, reduce) => {
+    try {
+      const loaded = cdp.once('Page.loadEventFired');
+      await cdp.send('Page.navigate', { url: `${ORIGIN}/` });
+      await loaded;
+      await sleep(300);
+      await evaluate(SAMPLER_INSTALL);
+      await evaluate(`window.__closeFocus = []; document.querySelector('#command-palette').addEventListener('close', () => window.__closeFocus.push(document.activeElement ? document.activeElement.id : null)); true`);
+      const state = async () => JSON.parse(await evaluate(PALETTE_STATE));
+
+      // "/" with focus on the page body opens the palette with the search field focused.
+      await evaluate('document.activeElement && document.activeElement.blur()');
+      await evaluate(SAMPLER_RESET);
+      await pressText('/', 'Slash', 191);
+      await poll('the palette to open', async () => (await state()).open, 2000, 30);
+      await sleep(250);
+      let now = await state();
+      report(now.open && now.focusId === 'palette-input' ? 'PASS' : 'FAIL', `[${tag}] "/" opens the palette with focus on the search field (focus ${now.focusId})`);
+      report(now.options.length === 4 && now.count === '4 results' ? 'PASS' : 'FAIL', `[${tag}] palette lists ${now.options.length} options, count "${now.count}"`);
+      if (width === 360) report(now.scrollWidth <= now.innerWidth ? 'PASS' : 'FAIL', `[${tag}] palette open: scrollWidth ${now.scrollWidth} vs innerWidth ${now.innerWidth}`);
+      const opened = JSON.parse(await evaluate(SAMPLER_READ));
+      if (reduce) report(opened.max === 0 ? 'PASS' : 'FAIL', `[${tag}] palette opens with no animation (max ${opened.max})`);
+      else report(opened.names.includes('motion-palette-in') ? 'PASS' : 'FAIL', `[${tag}] palette opening animates (animations: ${opened.names.join(', ')})`);
+      await screenshot(`palette-${fileTag}.png`, false);
+
+      // Typing filters the list and updates the polite count.
+      await cdp.send('Input.insertText', { text: 'slow' });
+      await sleep(100);
+      now = await state();
+      report(now.options.length === 1 && now.options[0].includes('Slow-burn inventory failure') && now.count === '1 result' ? 'PASS' : 'FAIL', `[${tag}] typing "slow" leaves ${JSON.stringify(now.options.map((text) => text.slice(0, 30)))}, count "${now.count}"`);
+
+      // Escape closes and focus returns to the opener (the visible trigger, since the body had focus).
+      await press('Escape', 'Escape', 27);
+      await sleep(150);
+      now = await state();
+      report(!now.open && now.focusId === 'palette-trigger' ? 'PASS' : 'FAIL', `[${tag}] Escape closes the palette and focus lands on the trigger (open ${now.open}, focus ${now.focusId})`);
+
+      // The visible trigger opens it; ArrowDown moves; Enter loads the case and focus returns to the opener.
+      await evaluate(`document.querySelector('#palette-trigger').focus()`);
+      await evaluate(`document.querySelector('#palette-trigger').click()`);
+      await poll('the palette to open from the trigger', async () => (await state()).open, 2000, 30);
+      await press('ArrowDown', 'ArrowDown', 40);
+      await sleep(60);
+      now = await state();
+      report(now.activeDescendant === 'palette-option-slow-burn' ? 'PASS' : 'FAIL', `[${tag}] ArrowDown moves the active option (aria-activedescendant ${now.activeDescendant})`);
+      await evaluate('window.__closeFocus.length = 0; true');
+      await press('Enter', 'Enter', 13);
+      await poll('the palette to close', async () => !(await state()).open, 2000, 30);
+      await sleep(100);
+      const closeFocus = JSON.parse(await evaluate('JSON.stringify(window.__closeFocus)'));
+      report(closeFocus.length === 1 && closeFocus[0] === 'palette-trigger' ? 'PASS' : 'FAIL', `[${tag}] Enter closes the palette with focus returned to the trigger (focus at close: ${JSON.stringify(closeFocus)})`);
+      try {
+        await poll('the Slow-burn result', () => evaluate(`document.querySelector('#result-title').textContent === 'Result: Slow-burn inventory failure'`), 10000, 50);
+        report('PASS', `[${tag}] Enter loaded the Slow-burn case`);
+      } catch (error) {
+        report('FAIL', `[${tag}] ${error.message}`);
+      }
+      await poll('the timeline', () => evaluate(`!!document.querySelector('.timeline-slider')`), 5000, 50);
+
+      // Ctrl+K opens it even from the timeline slider; Escape returns focus to the slider.
+      await evaluate(`document.querySelector('.timeline-slider').focus()`);
+      await pressText('k', 'KeyK', 75, 2);
+      await poll('the palette to open on Ctrl+K', async () => (await state()).open, 2000, 30);
+      now = await state();
+      report(now.focusId === 'palette-input' ? 'PASS' : 'FAIL', `[${tag}] Ctrl+K opens the palette from the slider (focus ${now.focusId})`);
+      await press('Escape', 'Escape', 27);
+      await sleep(150);
+      now = await state();
+      report(!now.open && now.focusClass.includes('timeline-slider') ? 'PASS' : 'FAIL', `[${tag}] Escape returns focus to the slider (focus class ${now.focusClass})`);
+
+      // A slash typed into a text field is text, not a shortcut.
+      await evaluate(`document.querySelector('button[data-case-id="own-files"]').click()`);
+      await poll('the own-files form', () => evaluate(`!!document.querySelector('#own-files-host textarea') && !document.querySelector('#own-files-host').hidden`), 3000, 50);
+      // The paste field sits in a collapsed disclosure, so open it before focusing the textarea.
+      await evaluate(`(() => { const textarea = document.querySelector('#own-files-host textarea'); textarea.closest('details').open = true; textarea.focus(); return true; })()`);
+      await pressText('/', 'Slash', 191);
+      await sleep(150);
+      now = await state();
+      report(!now.open && now.focusTag === 'TEXTAREA' ? 'PASS' : 'FAIL', `[${tag}] "/" inside a text field does not open the palette (open ${now.open}, focus ${now.focusTag})`);
+
+      // Choosing "Use your own files" lands in the form instead of restoring focus to the opener.
+      await evaluate('document.activeElement && document.activeElement.blur()');
+      await pressText('/', 'Slash', 191);
+      await poll('the palette to open again', async () => (await state()).open, 2000, 30);
+      await cdp.send('Input.insertText', { text: 'own' });
+      await sleep(80);
+      await press('Enter', 'Enter', 13);
+      await sleep(300);
+      now = await state();
+      report(!now.open && now.focusTag === 'TEXTAREA' ? 'PASS' : 'FAIL', `[${tag}] choosing "Use your own files" focuses the form (open ${now.open}, focus ${now.focusTag})`);
+    } catch (error) {
+      report('FAIL', `[${tag}] palette: ${error.message}`);
+    }
+  };
+
   const viewports = [
     { width: 1280, height: 720, mobile: false },
     { width: 360, height: 740, mobile: true },
@@ -645,6 +764,8 @@ async function main() {
           report('FAIL', `[${tag}] drawer: ${error.message}`);
         }
       }
+
+      await runPaletteChecks(tag, fileTag, width, reduce);
     }
   }
 

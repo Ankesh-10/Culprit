@@ -50,7 +50,10 @@
         </ul>
       </header>
       <section id="input-panel" class="panel" aria-labelledby="input-title">
-        <h2 id="input-title">Load an incident</h2>
+        <div class="panel-heading-row">
+          <h2 id="input-title">Load an incident</h2>
+          <button type="button" id="palette-trigger" class="button-secondary palette-trigger" aria-haspopup="dialog" aria-keyshortcuts="/ Control+K Meta+K">Press <kbd>/</kbd> to jump to a case</button>
+        </div>
         <div id="case-picker" class="case-picker"></div>
       </section>
       <div id="status-region" class="status-region">
@@ -66,6 +69,7 @@
       <p class="noscript-message">Culprit needs JavaScript enabled to run its local analysis console.</p>
     </noscript>
     <dialog id="suspect-drawer" class="suspect-drawer" aria-labelledby="drawer-title"></dialog>
+    <dialog id="command-palette" class="command-palette" aria-labelledby="palette-title"></dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
